@@ -253,7 +253,7 @@ def DataDict(DATA_PATH = "", dataset_name=None, file_ext="png"):
 
 class Fit_Dataset(Dataset):
 
-    def __init__(self,dict_files,num_classes=2, isBinary=True, H=512, W=512, augment_first_image=False, use_augmentations=False, simple_augmentations=False, use_inversion=False, normalize=False, use_crop=False, crop256=False, num_channels=5, dataset_name="flair", class_mapping_to=None, use_flair_classes=False, use_target_classes=False, args=None):
+    def __init__(self,dict_files,num_classes=2, isBinary=True, H=512, W=512, augment_first_image=False, use_augmentations=False, simple_augmentations=False, use_inversion=False, normalize=False, crop256=False, num_channels=5, dataset_name="flair", class_mapping_to=None, use_flair_classes=False, use_target_classes=False, args=None):
         self.list_imgsA = np.array(dict_files["IMG_A"])
         self.list_imgsB = np.array(dict_files["IMG_B"])
         self.list_msks = np.array(dict_files["MSK"])
@@ -271,7 +271,6 @@ class Fit_Dataset(Dataset):
         if self.use_inversion:
             print("Using random inversions")
         self.normalize = normalize
-        self.use_crop = use_crop
         self.use_crop256 = crop256
 
         if "DS" in dict_files:
@@ -299,9 +298,6 @@ class Fit_Dataset(Dataset):
             self.inv_mapping = None
         
         
-
-        
-        self.crop = A.Compose([A.RandomCrop(H, W, p=1.0)], additional_targets={'imageB': 'image', 'msk': 'mask'}, is_check_shapes=False)
         self.crop256 = A.Compose([A.RandomCrop(256, 256, p=1.0)], additional_targets={'imageB': 'image', 'msk': 'mask'}, is_check_shapes=False)
         self.crop512 = A.Compose([A.RandomCrop(512, 512, p=1.0)], additional_targets={'imageB': 'image', 'msk': 'mask'}, is_check_shapes=False)
 
@@ -322,23 +318,9 @@ class Fit_Dataset(Dataset):
             additional_targets={'imageB': 'image', 'msk': 'mask'}
         )
 
-        self.trfSame = A.Compose([
-            A.HorizontalFlip(p=0.5),
-            A.VerticalFlip(p=0.5),
-            A.RandomRotate90(p=0.5),
-            A.RandomResizedCrop(H,W, scale=(0.4, 1.0), p=0.5),
-            ],
-            additional_targets={'imageB': 'image', 'msk': 'mask'}
-        )
-
-        self.trfA = A.Compose([    # ToFloat is already applied in the Normalize function
+        self.trfColor = A.Compose([   
             A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2, p=0.2), 
         ])
-
-        self.trfB = A.Compose([
-            A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2, p=0.2),
-        ])
-
         
         if self.normalize:
             print("Normalization of the inputs !!!")
@@ -371,10 +353,7 @@ class Fit_Dataset(Dataset):
         mask_file = self.list_msks[index]
         imgB = self.read_img(raster_file=image_fileB)
         if imgB is None:
-            if ds=="changenet":
-                imgB = imgA.copy()
-            else:
-                imgB = np.zeros([self.num_channels,512,512]).astype(np.uint8)
+            imgB = np.zeros([self.num_channels,512,512]).astype(np.uint8)
         if (ds=="syntheworld") & (imgB.shape[1]==1024):
             image_fileA = image_fileB.replace("images", "small_pre_images")
         imgA = self.read_img(raster_file=image_fileA)
@@ -412,30 +391,7 @@ class Fit_Dataset(Dataset):
             msk[0] = (msk[0]>0).astype(int)
             msk[1] = 0
             msk[2] = msk[0] * 1   # 1 corresponds to Flair building class
-        elif ds=="changenet":
-            msk1 = msk.copy()
-            msk = np.zeros_like(imgA)
-            _, H, W = imgA.shape
-            msk[0] = (msk1[0,:,:W]!=msk1[0,:,W+10:]).astype(int)
-            msk[1] = msk1[0,:,:W]
-            msk[2] = msk1[0,:,W+10:]
-            if (W>=512) & (H>=512):
-                timgs = self.crop(image=np.moveaxis(imgA,0,2), imageB=np.moveaxis(imgB,0,2), msk=np.moveaxis(msk,0,2))
-                imgA = np.moveaxis(timgs["image"],2,0)
-                imgB = np.moveaxis(timgs["imageB"],2,0)
-                msk = np.moveaxis(timgs["msk"],2,0)
-            #print("{} - {} - {}".format(imgA.shape, imgB.shape, msk.shape))
-        elif ds=="gers":
-            msk1 = msk.copy()
-            msk = np.zeros_like(imgA)
-            msk[0] = msk1[0]
-        #elif ds=="second":
-         #   msk1 = msk[1:].copy()
-          #  msk[1:][msk1==1] = 3
-           # msk[1:][msk1==3] = 4
-            #msk[1:][msk1==4] = 1
-
-        ##################
+        
         if self.use_crop256:
             timgs = self.crop256(image=np.moveaxis(imgA,0,2), imageB=np.moveaxis(imgB,0,2), msk=np.moveaxis(msk,0,2))
             imgA = np.moveaxis(timgs["image"],2,0)
@@ -450,26 +406,15 @@ class Fit_Dataset(Dataset):
 
         if (self.use_target_classes and ds=="flair") or (self.use_target_classes and (ds in ["syntheworld","changen"]))  or (self.use_flair_classes and ds!="flair"):
             msk[1:] = np.vectorize(self.getDict)(msk[1:])
-                
-        if self.use_crop:
-            timgs = self.crop(image=np.moveaxis(imgA,0,2), imageB=np.moveaxis(imgB,0,2), msk=np.moveaxis(msk,0,2))
-            imgA = np.moveaxis(timgs["image"],2,0)
-            imgB = np.moveaxis(timgs["imageB"],2,0)
-            msk = np.moveaxis(timgs["msk"],2,0)
         
         if self.augment_first_image and ds=="flair":
             timg = self.trfFirst(image = np.moveaxis(imgA,0,2))
             imgA = np.moveaxis(timg["image"],2,0)
 
         if self.use_augmentations:
-            timgs = self.trfSame(image=np.moveaxis(imgA,0,2), imageB=np.moveaxis(imgB,0,2), msk=np.moveaxis(msk,0,2))
-            timgA = self.trfA(image=timgs["image"])
-            timgB = self.trfB(image=timgs["imageB"])
-            if self.normalize:
-                timgA = self.normA(image=timgA["image"])
-                timgB = self.normB(image=timgB["image"])
-            imgA = np.moveaxis(timgA["image"],2,0)
-            imgB = np.moveaxis(timgB["image"],2,0)
+            timgs = self.trfSimple(image=np.moveaxis(imgA,0,2), imageB=np.moveaxis(imgB,0,2), msk=np.moveaxis(msk,0,2))
+            imgA = self.trfColor(image=timgs["image"])
+            imgB = self.trfColor(image=timgs["imageB"])
             msk = np.moveaxis(timgs["msk"],2,0)
         
         if self.simple_augmentations:
@@ -477,35 +422,136 @@ class Fit_Dataset(Dataset):
             imgA = np.moveaxis(timgs["image"],2,0)
             imgB = np.moveaxis(timgs["imageB"],2,0)
             msk = np.moveaxis(timgs["msk"],2,0)
-            if self.normalize:
+        
+        if self.normalize:
                 imgA = np.moveaxis(self.normA(image=np.moveaxis(imgA,0,2))["image"],2,0)
                 imgB = np.moveaxis(self.normB(image=np.moveaxis(imgB,0,2))["image"],2,0)
-            else:
-                imgA = img_as_float(imgA)
-                imgB = img_as_float(imgB)
         else:
-            if self.normalize:
-                #print(f"Before norm : {imgA[:,0,0]}")
-                imgA = np.moveaxis(self.normA(image=np.moveaxis(imgA,0,2))["image"],2,0)
-                imgB = np.moveaxis(self.normB(image=np.moveaxis(imgB,0,2))["image"],2,0)
-                #print(f"After norm : {imgA[:,0,0]}")
-            else:
-                imgA = img_as_float(imgA)
-                imgB = img_as_float(imgB)
+            imgA = img_as_float(imgA)
+            imgB = img_as_float(imgB)
 
         if self.use_inversion:
             if torch.rand(1)>0.5:
                 imgA, imgB = imgB, imgA
                 if len(msk)>1:
                     msk[1], msk[2] = msk[2], msk[1]
-
-        #if imgA.shape[1]>=1024:
-        #    return {"image1":[torch.as_tensor(imgA[:,512*i:512*(i+1),512*j:512*(j+1)], dtype=torch.float) for i in range(imgA.shape[1]//512) for j in range(imgA.shape[2]//512)],
-        #     "image2":[torch.as_tensor(imgB[:,512*i:512*(i+1),512*j:512*(j+1)], dtype=torch.float) for i in range(imgB.shape[1]//512) for j in range(imgB.shape[2]//512)],
-        #     "mask":[torch.as_tensor(msk[:,512*i:512*(i+1),512*j:512*(j+1)], dtype=torch.long) for i in range(msk.shape[1]//512) for j in range(msk.shape[2]//512)]}
-        
         
         return {"image1": torch.as_tensor(imgA, dtype=torch.float),
                         "image2": torch.as_tensor(imgB, dtype=torch.float), 
                         "mask": torch.as_tensor(msk, dtype=torch.long),
                         "path":image_fileB}
+    
+
+
+class LEVIR_DataModule(LightningDataModule):
+
+    def __init__(self,dict_train=None,dict_val=None,dict_test=None,num_workers=1,batch_size=2,drop_last=True,num_classes=2,num_channels=3, augment_first_image=False, use_augmentations=False, simple_augmentations=False, use_inversion=False, normalize=False, isBinary=True, dataset_name="flair", class_mapping_to=None,use_flair_classes=False, use_target_classes=False,crop256=False,args=None):
+        super().__init__()
+        self.dict_train = dict_train
+        self.dict_val = dict_val
+        self.dict_test = dict_test
+        self.batch_size = batch_size
+        self.num_classes, self.num_channels = num_classes, num_channels
+        self.num_workers = num_workers
+        self.train_dataset = None
+        self.val_dataset = None
+        self.pred_dataset = None
+        self.drop_last = drop_last
+        self.use_augmentations = use_augmentations
+        self.simple_augmentations = simple_augmentations
+        self.use_inversion = use_inversion
+        self.isBinary = isBinary
+        self.normalize = normalize
+        self.dataset_name = dataset_name
+        self.class_mapping_to = class_mapping_to
+        self.augment_first_image = augment_first_image
+        self.use_flair_classes=use_flair_classes
+        self.use_target_classes=use_target_classes
+        self.crop256=crop256
+        self.collate_fn = None
+        self.args =args
+        
+    def prepare_data(self):
+        pass
+
+    def setup(self, stage="fit"):
+        if stage == "fit" or stage == "validate":
+            self.train_dataset = Fit_Dataset(
+                dict_files=self.dict_train,
+                num_classes=self.num_classes,
+                isBinary = self.isBinary,
+                use_augmentations=self.use_augmentations,
+                simple_augmentations = self.simple_augmentations,
+                augment_first_image = self.augment_first_image,
+                use_inversion = self.use_inversion,
+                normalize=self.normalize,
+                dataset_name=self.dataset_name, class_mapping_to=self.class_mapping_to,num_channels=self.num_channels,
+                use_flair_classes=self.use_flair_classes, use_target_classes=self.use_target_classes,
+                crop256=self.crop256,
+                args=self.args)
+
+            self.val_dataset = Fit_Dataset(
+                dict_files=self.dict_val,
+                num_classes=self.num_classes,
+                isBinary = self.isBinary,
+                use_augmentations=False,
+                simple_augmentations = self.simple_augmentations,
+                augment_first_image = self.augment_first_image,
+                normalize=self.normalize,
+                dataset_name=self.dataset_name, class_mapping_to=self.class_mapping_to,num_channels=self.num_channels,
+                use_flair_classes=self.use_flair_classes, use_target_classes=self.use_target_classes,
+                args=self.args
+            )
+            self.pred_dataset = Fit_Dataset(
+                dict_files=self.dict_test,
+                num_classes=self.num_classes,
+                isBinary = self.isBinary,
+                use_augmentations=False,
+                simple_augmentations = False,
+                normalize=self.normalize,
+                dataset_name=self.dataset_name, class_mapping_to=self.class_mapping_to,num_channels=self.num_channels,
+                use_flair_classes=self.use_flair_classes, use_target_classes=self.use_target_classes,
+                args=self.args
+            )
+
+        elif stage == "predict":
+            self.pred_dataset = Fit_Dataset(
+                dict_files=self.dict_test,
+                num_classes=self.num_classes,
+                isBinary = self.isBinary,
+                use_augmentations=False,
+                normalize=self.normalize,
+                dataset_name=self.dataset_name, class_mapping_to=self.class_mapping_to,num_channels=self.num_channels,
+                use_flair_classes=self.use_flair_classes, use_target_classes=self.use_target_classes,
+                args=self.args
+            )
+
+    def train_dataloader(self):
+        return DataLoader(
+            dataset=self.train_dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
+            num_workers=self.num_workers,
+            drop_last=self.drop_last,
+            collate_fn = self.collate_fn,
+        )
+
+    def val_dataloader(self):
+        return DataLoader(
+            dataset=self.val_dataset,
+            batch_size=self.batch_size,
+            shuffle=True,   ###########################################
+            num_workers=self.num_workers,
+            drop_last=self.drop_last,
+            collate_fn = self.collate_fn,
+        )
+    
+    def test_dataloader(self):
+        return DataLoader(
+            dataset=self.pred_dataset,
+            batch_size=self.batch_size, 
+            shuffle=False,
+            num_workers=self.num_workers,
+            drop_last=self.drop_last,
+            collate_fn = self.collate_fn,
+        )

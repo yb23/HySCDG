@@ -53,3 +53,5 @@ def convert_to_color(arr_2d: np.ndarray, palette: dict = lut_colors) -> np.ndarr
         m = arr_2d == c
         arr_3d[m] = i
     return arr_3d
+
+
