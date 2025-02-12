@@ -9,7 +9,7 @@ def makeModel(args):
     config = get_config(args)
     model = STMambaSCD(output_cd = 2, 
                 output_clf = args.classes,
-                pretrained=args.pretrained_weight_path,
+                pretrained="pretrained/vssm_base_0229_ckpt_epoch_237.pth",
                 patch_size=config.MODEL.VSSM.PATCH_SIZE, 
                 in_chans=args.in_channels, 
                 num_classes=args.classes, 

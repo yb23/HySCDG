@@ -166,11 +166,37 @@ def mixDicts(dict_flair, dict_target, ratio):  #### ratio = target data proporti
     print(f"Total size : {len(dictMix['IMG_A'])}")
     return dictMix
 
+def loadPretrainData(args):
+        file_ext = ".tif" if args.pretrain_name=="fsc" else ".png"
+        data = {"train":{"IMG_A":[], "IMG_B":[], "MSK":[], "MSK_A":[]},
+                    "val":{"IMG_A":[], "IMG_B":[], "MSK":[], "MSK_A":[]}}
+        available_images = glob.glob(args.pretrain_path+"B/*"+file_ext)
 
-def DataDict(DATA_PATH = "", dataset_name=None, file_ext="png"):
+        if args.restr_train_set:
+            available_images = available_images[:200]
+
+        n_images = len(available_images)
+        print("Total Images : {}".format(n_images))
+        imgB_train = available_images[:int(0.8*n_images)]
+        data["train"]["IMG_B"] += imgB_train
+        data["train"]["IMG_A"] += [x.replace("/B/","/A/") for x in imgB_train]
+        data["train"]["MSK"] += [x.replace("/B/","/LBL/").replace("IMG_","LBL_") for x in imgB_train]
+        data["train"]["MSK_A"] += [""] * len(imgB_train)
+        data["train"]["DS"] = [args.pretrain_name]*len(data["train"]["IMG_A"])
+
+        imgB_val = available_images[int(0.8*n_images):]
+        data["val"]["IMG_B"] += imgB_val
+        data["val"]["IMG_A"] += [x.replace("/B/","/A/") for x in imgB_val]
+        data["val"]["MSK"] += [x.replace("/B/","/LBL/").replace("IMG_","LBL_") for x in imgB_val]
+        data["val"]["MSK_A"] += [""] * len(imgB_val)
+        data["val"]["DS"] = [args.pretrain_name]*len(data["val"]["IMG_A"])
+        return data
+
+
+def DataDict(data_path = "", dataset_name=None, file_ext="png"):
     dict_train = {}
-    print(DATA_PATH + f"train/A/*.{file_ext}")
-    imgsA = glob.glob(DATA_PATH + f"train/A/*.{file_ext}", recursive=True)
+    print(data_path + f"train/A/*.{file_ext}")
+    imgsA = glob.glob(data_path + f"train/A/*.{file_ext}", recursive=True)
 
     imgsB = [x.replace("/A/","/B/") for x in imgsA]
     lbls = [x.replace("/A/","/label/") for x in imgsA]
@@ -179,8 +205,8 @@ def DataDict(DATA_PATH = "", dataset_name=None, file_ext="png"):
     dict_train["MSK"] = lbls
 
     dict_val = {}
-    imgsA = glob.glob(DATA_PATH + f"val/A/*.{file_ext}", recursive=True)
-    imgsA_ = glob.glob(DATA_PATH + f"test/A/*.{file_ext}", recursive=True)
+    imgsA = glob.glob(data_path + f"val/A/*.{file_ext}", recursive=True)
+    imgsA_ = glob.glob(data_path + f"test/A/*.{file_ext}", recursive=True)
     if len(imgsA)>0 and len(imgsA_)>0:
         print("Validation and test set available")
         imgsB = [x.replace("/A/","/B/") for x in imgsA]
@@ -205,9 +231,9 @@ def DataDict(DATA_PATH = "", dataset_name=None, file_ext="png"):
         dict_test["IMG_B"] = imgsB
         dict_test["MSK"] = lbls
         dict_val = dict_test
-    elif os.path.isfile(DATA_PATH+"test_filenames.csv"):
+    elif os.path.isfile(data_path+"test_filenames.csv"):
         print("Using test_filenames.csv to create test set !")
-        toRemove = set(pd.read_csv(DATA_PATH+"test_filenames.csv")["filename"])
+        toRemove = set(pd.read_csv(data_path+"test_filenames.csv")["filename"])
         dict_test = {}
         print(len(dict_train["IMG_A"]))
         for key in dict_train:
@@ -231,7 +257,7 @@ def DataDict(DATA_PATH = "", dataset_name=None, file_ext="png"):
         dict_test["MSK"] = lbls[n1:]
 
     dict_visu = {}
-    lbls = glob.glob(DATA_PATH + f"specific/label/*.{file_ext}", recursive=True)
+    lbls = glob.glob(data_path + f"specific/label/*.{file_ext}", recursive=True)
     if len(lbls)==0:
         dict_visu = None
     else:
@@ -247,27 +273,27 @@ def DataDict(DATA_PATH = "", dataset_name=None, file_ext="png"):
     if dataset_name is not None:
         dict_train["DS"], dict_val["DS"], dict_test["DS"] = [dataset_name]*len(dict_train["IMG_A"]), [dataset_name]*len(dict_val["IMG_B"]), [dataset_name]*len(dict_test["IMG_A"])
 
-    return dict_train, dict_val, dict_test, dict_visu
-
+    return {"train":dict_train,
+            "val":dict_val,
+            "test":dict_test,
+            "visu":dict_visu}
 
 
 class Fit_Dataset(Dataset):
 
-    def __init__(self,dict_files,num_classes=2, isBinary=True, H=512, W=512, augment_first_image=False, use_augmentations=False, simple_augmentations=False, use_inversion=False, normalize=False, crop256=False, num_channels=5, dataset_name="flair", class_mapping_to=None, use_flair_classes=False, use_target_classes=False, args=None):
+    def __init__(self,dict_files,num_classes=2, isBinary=True, H=512, W=512, augment_first_image=False, use_augmentations=False, use_inversion=False, normalize=False, crop256=False, num_channels=5, dataset_name="fsc", class_mapping_to=None, args=None):
         self.list_imgsA = np.array(dict_files["IMG_A"])
         self.list_imgsB = np.array(dict_files["IMG_B"])
         self.list_msks = np.array(dict_files["MSK"])
         if "MSK_A" in dict_files:
             self.list_msksA = np.array(dict_files["MSK_A"])
         self.augment_first_image = augment_first_image
-        self.simple_augmentations = simple_augmentations
-        self.use_target_classes = use_target_classes & (class_mapping_to is not None)
-        self.use_flair_classes = use_flair_classes & (class_mapping_to is not None)
+        self.use_target_classes = (class_mapping_to is not None)
         self.num_classes = num_classes
         self.binary = isBinary
         self.num_channels = num_channels
         self.use_augmentations = use_augmentations
-        self.use_inversion = use_inversion or simple_augmentations or augment_first_image
+        self.use_inversion = use_inversion or use_augmentations or augment_first_image
         if self.use_inversion:
             print("Using random inversions")
         self.normalize = normalize
@@ -279,21 +305,17 @@ class Fit_Dataset(Dataset):
             self.list_dataset = [dataset_name] * len(self.list_imgsA)        
 
         if self.use_target_classes:
-            if args.syntheworld:
+            if args.pretrain_name=="syntheworld":
                 print(f"Mapping from SyntheWorld to {class_mapping_to}")
                 self.class_mapping = mappings_syntheworld[class_mapping_to]
-            elif args.changen:
+            elif args.pretrain_name=="changen":
                 print(f"Mapping from Changen2 to {class_mapping_to}")
                 self.class_mapping = mappings_changen[class_mapping_to]
-            else:
-                print(f"Mapping from Flair to {class_mapping_to}")
+            elif args.pretrain_name=="fsc":
+                print(f"Mapping from FSC to {class_mapping_to}")
                 self.class_mapping = mappings_flair[class_mapping_to]
             self.getDict = lambda x:self.class_mapping.get(x, 0)
             self.inv_mapping = {val:key for (key,val) in self.class_mapping.items()}
-        elif self.use_flair_classes:
-            self.inv_mapping = mappings_flair[class_mapping_to]
-            self.class_mapping = {val:key for (key,val) in self.inv_mapping.items()}
-            self.getDict = lambda x:self.class_mapping.get(x, 0)
         else:
             self.inv_mapping = None
         
@@ -380,7 +402,7 @@ class Fit_Dataset(Dataset):
                 msk = msk[[2,0,1]]  ### put the change labels on first layer, semantics image 1 on second layer and semantics image 2 on third layer
                 msk[0] -= 1   ###  use -1, 0, 1 as labels (-1 for unlabeled)
             
-        elif ds=="flair":
+        elif ds=="fsc":
             mask_fileA = self.list_msksA[index]
             if mask_fileA != "":
                 mskA = self.read_msk(raster_file=mask_fileA)
@@ -404,21 +426,17 @@ class Fit_Dataset(Dataset):
             imgB = np.moveaxis(timgs["imageB"],2,0)
             msk = np.moveaxis(timgs["msk"],2,0)
 
-        if (self.use_target_classes and ds=="flair") or (self.use_target_classes and (ds in ["syntheworld","changen"]))  or (self.use_flair_classes and ds!="flair"):
+        if (self.use_target_classes and (ds in ["fsc","syntheworld","changen"])):
             msk[1:] = np.vectorize(self.getDict)(msk[1:])
         
-        if self.augment_first_image and ds=="flair":
+        if self.augment_first_image:
             timg = self.trfFirst(image = np.moveaxis(imgA,0,2))
             imgA = np.moveaxis(timg["image"],2,0)
 
         if self.use_augmentations:
             timgs = self.trfSimple(image=np.moveaxis(imgA,0,2), imageB=np.moveaxis(imgB,0,2), msk=np.moveaxis(msk,0,2))
-            imgA = self.trfColor(image=timgs["image"])
-            imgB = self.trfColor(image=timgs["imageB"])
-            msk = np.moveaxis(timgs["msk"],2,0)
-        
-        if self.simple_augmentations:
-            timgs = self.trfSimple(image=np.moveaxis(imgA,0,2), imageB=np.moveaxis(imgB,0,2), msk=np.moveaxis(msk,0,2))
+            #timgs["image"] = self.trfColor(image=timgs["image"])
+            #timgs["imageB"] = self.trfColor(image=timgs["imageB"])
             imgA = np.moveaxis(timgs["image"],2,0)
             imgB = np.moveaxis(timgs["imageB"],2,0)
             msk = np.moveaxis(timgs["msk"],2,0)
@@ -445,7 +463,7 @@ class Fit_Dataset(Dataset):
 
 class LEVIR_DataModule(LightningDataModule):
 
-    def __init__(self,dict_train=None,dict_val=None,dict_test=None,num_workers=1,batch_size=2,drop_last=True,num_classes=2,num_channels=3, augment_first_image=False, use_augmentations=False, simple_augmentations=False, use_inversion=False, normalize=False, isBinary=True, dataset_name="flair", class_mapping_to=None,use_flair_classes=False, use_target_classes=False,crop256=False,args=None):
+    def __init__(self,dict_train=None,dict_val=None,dict_test=None,num_workers=1,batch_size=2,drop_last=True,num_classes=2,num_channels=3, augment_first_image=False, use_augmentations=False, use_inversion=False, normalize=False, isBinary=True, dataset_name="fsc", class_mapping_to=None, crop256=False,args=None):
         super().__init__()
         self.dict_train = dict_train
         self.dict_val = dict_val
@@ -458,22 +476,18 @@ class LEVIR_DataModule(LightningDataModule):
         self.pred_dataset = None
         self.drop_last = drop_last
         self.use_augmentations = use_augmentations
-        self.simple_augmentations = simple_augmentations
         self.use_inversion = use_inversion
         self.isBinary = isBinary
         self.normalize = normalize
         self.dataset_name = dataset_name
         self.class_mapping_to = class_mapping_to
         self.augment_first_image = augment_first_image
-        self.use_flair_classes=use_flair_classes
-        self.use_target_classes=use_target_classes
         self.crop256=crop256
         self.collate_fn = None
         self.args =args
         
     def prepare_data(self):
         pass
-
     def setup(self, stage="fit"):
         if stage == "fit" or stage == "validate":
             self.train_dataset = Fit_Dataset(
@@ -481,12 +495,10 @@ class LEVIR_DataModule(LightningDataModule):
                 num_classes=self.num_classes,
                 isBinary = self.isBinary,
                 use_augmentations=self.use_augmentations,
-                simple_augmentations = self.simple_augmentations,
                 augment_first_image = self.augment_first_image,
                 use_inversion = self.use_inversion,
                 normalize=self.normalize,
                 dataset_name=self.dataset_name, class_mapping_to=self.class_mapping_to,num_channels=self.num_channels,
-                use_flair_classes=self.use_flair_classes, use_target_classes=self.use_target_classes,
                 crop256=self.crop256,
                 args=self.args)
 
@@ -495,11 +507,9 @@ class LEVIR_DataModule(LightningDataModule):
                 num_classes=self.num_classes,
                 isBinary = self.isBinary,
                 use_augmentations=False,
-                simple_augmentations = self.simple_augmentations,
                 augment_first_image = self.augment_first_image,
                 normalize=self.normalize,
                 dataset_name=self.dataset_name, class_mapping_to=self.class_mapping_to,num_channels=self.num_channels,
-                use_flair_classes=self.use_flair_classes, use_target_classes=self.use_target_classes,
                 args=self.args
             )
             self.pred_dataset = Fit_Dataset(
@@ -507,10 +517,8 @@ class LEVIR_DataModule(LightningDataModule):
                 num_classes=self.num_classes,
                 isBinary = self.isBinary,
                 use_augmentations=False,
-                simple_augmentations = False,
                 normalize=self.normalize,
                 dataset_name=self.dataset_name, class_mapping_to=self.class_mapping_to,num_channels=self.num_channels,
-                use_flair_classes=self.use_flair_classes, use_target_classes=self.use_target_classes,
                 args=self.args
             )
 
@@ -522,7 +530,6 @@ class LEVIR_DataModule(LightningDataModule):
                 use_augmentations=False,
                 normalize=self.normalize,
                 dataset_name=self.dataset_name, class_mapping_to=self.class_mapping_to,num_channels=self.num_channels,
-                use_flair_classes=self.use_flair_classes, use_target_classes=self.use_target_classes,
                 args=self.args
             )
 

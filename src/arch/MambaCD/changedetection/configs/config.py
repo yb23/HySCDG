@@ -228,7 +228,7 @@ def _update_config_from_file(config, cfg_file):
 
 
 def update_config(config, args):
-    _update_config_from_file(config, args.cfg)
+    _update_config_from_file(config, "vssm1/vssm_base_224.yaml")
 
     config.defrost()
     if args.opts:

@@ -3,36 +3,22 @@ import os
 
 import matplotlib.pyplot as plt
 
-try:
-    from MambaCD.changedetection.models.STMambaSCD import STMambaSCD
-    from MambaCD.changedetection.configs.config import get_config
-except:
-    print("No MambaCD : Import error !")
 
-from dchan.scannet import SCanNet, getEncoder
 
-from dchan.scannet_orig import SCanNet as SCanNet_orig, ChangeSimilarity
+from .arch.scannet.models import SCanNet, ChangeSimilarity
+from .arch import mambaCD
+from .arch import dualUNet
 
-from . import sepKappa
 from scipy import stats as scipy_stats
 
-import wandb
-from maskToColor import convert_to_color
 import numpy as np
-import psutil
-import random
 import torch.nn.functional as F
-import copy
 
-from torchvision.utils import make_grid
 
-from pytorch_lightning.utilities import rank_zero_only
-
-from .changeformer.ChangeFormer import ChangeFormerV6
 from PIL import Image
 import torch
 import torch.nn as nn
-from pytorch_lightning import LightningDataModule, LightningModule, Callback
+from pytorch_lightning import LightningModule
 
 from segmentation_models_pytorch.losses import DiceLoss, FocalLoss, JaccardLoss
 import torchmetrics
@@ -40,47 +26,7 @@ from torchmetrics import MetricCollection
 from torchmetrics.classification import (Accuracy, FBetaScore, JaccardIndex, Precision, Recall)
 from torchmetrics.wrappers import ClasswiseWrapper
 
-from segmentation_models_pytorch.base import SegmentationModel
-def new_forward(self, x, return_features=False, sem_features=None, chg_features=None, concat_features=True, abs_diff=False, encoder_only=False, decoder_only=False):
-    if not decoder_only:
-        self.check_input_shape(x)
-        features = self.encoder(x)
-    else:
-        features = x
-    
-    if encoder_only:
-        return features
-    
-    if sem_features is not None:
-        sem1, sem2 = sem_features
-        for (i,feat) in enumerate(features):
-            if i>0:
-                features[i] = feat + sem1[i] - sem2[i]
-    elif chg_features is not None:
-        for (i,feat) in enumerate(features):
-            if i>0:
-                features[i] = feat + chg_features[i]
 
-    decoder_output = self.decoder(*features)
-    
-    if self.doSemantics:
-        y1 = self.decoderSem(*features)
-        if self.double_decoder:
-            y2 = self.decoderSem2(*features)
-    masks = self.segmentation_head(decoder_output)
-
-    if self.classification_head is not None:
-        if self.doSemantics:
-            labels = torch.cat((self.classification_head1(y1),self.classification_head2(y1)), dim=1)
-        else:
-            labels = self.classification_head(decoder_output)
-        
-        return masks, labels
-    
-    if return_features:
-        return masks, features
-    else:
-        return masks
     
 
 def computeSepKappa(histKappa, iou, num_classes=20):
@@ -121,15 +67,10 @@ class Lightning(LightningModule):
                         ignore_index: Optional[int] = None,   #### ignore_index pour les classes sémantiques -> mettre 0 pour Flair et HiUCD (unlabeled)
                         doSemantics=False,
                         args=None,
-                        out_mapping=None,
                         freeze_encoder=False, freeze_decoder=False):
         super().__init__()
 
         self.num_classes=num_classes
-        if limit_class_test is None:
-            limit_class_test = []
-        self.restrict_class_test=len(limit_class_test)>0
-        self.limit_class_test = limit_class_test
         self.weights = weights
         self.multiclass = (num_classes>2)
         
@@ -180,18 +121,10 @@ class Lightning(LightningModule):
         self.seg_model = None
         if model_name == "unet":
             self.model, self.seg_model = dualUNet.make_model()
-        
-        elif model_name == "changeformer":
-            self.model = ChangeFormerV6(
-                input_nc=in_channels,
-                output_nc=2,
-                decoder_softmax=False,
-                embed_dim=256,
-            )
         elif model_name=="mambaCD":
             self.model = mambaCD.makeModel(args)
         elif model_name=="scannet":
-            self.model = scannet.makeModel(in_channels=3, num_classes=num_classes, input_size=512, resnet_weights_path=args.pretrained_weight_path)
+            self.model = SCanNet(in_channels=in_channels, num_classes=num_classes, input_size=512, resnet_weights_path="")
         else:
             raise ValueError(f"Model type '{model_name}' is not valid.")
 
@@ -256,16 +189,16 @@ class Lightning(LightningModule):
     def forward(self, x):
         if self.hparams["model_name"]=="unet":
             if self.multiclass:
-                y1, f1 = self.seg_model(x[:,:x.shape[1]//2], return_features=True)
-                y2, f2 = self.seg_model(x[:,x.shape[1]//2:], return_features=True)
+                y1, f1 = self.seg_model(x[0], return_features=True)
+                y2, f2 = self.seg_model(x[1], return_features=True)
                 labels = (y1, y2)
-                y = self.model(x, sem_features = (f1, f2))
+                y = self.model(torch.cat(x, dim=1), sem_features = (f1, f2))
             else:
-                y = self.model(x)
+                y = self.model(torch.cat(x, dim=1))
                 labels = None
             return y, labels
         
-        elif self.hparams["model"] in ["mambaCD","changeformer","scannet"]:
+        elif self.hparams["model"] in ["mambaCD","scannet"]:
             return self.model(x[0],x[1])
 
     def configure_losses(self):
