@@ -190,7 +190,108 @@ def loadPretrainData(args):
         data["val"]["MSK"] += [x.replace("/B/","/LBL/").replace("IMG_","LBL_") for x in imgB_val]
         data["val"]["MSK_A"] += [""] * len(imgB_val)
         data["val"]["DS"] = [args.pretrain_name]*len(data["val"]["IMG_A"])
+
+        data["test"] = data["val"]
         return data
+
+
+def loadSyntheWorld(data_path, restr_train_set=False):
+    data = {"train":{"IMG_A":[], "IMG_B":[], "MSK":[]},
+                        "val":{"IMG_A":[], "IMG_B":[], "MSK":[]},}
+    for num in [1,2,3,1024]:
+        available_images = glob.glob(f"{data_path}/{num}/images/*.png")
+        if restr_train_set:
+            available_images = available_images[:200]
+        n_images = len(available_images)
+        print("Total Images : {}".format(n_images))
+        imgB_train = available_images[:int(0.8*n_images)]
+        data["train"]["IMG_B"] += imgB_train
+        data["train"]["IMG_A"] += [x.replace("images","pre_event") for x in imgB_train]
+        data["train"]["MSK"] += [x.replace("images","cd_mask") for x in imgB_train]
+        #data_flair["train"]["MSK_SEM"] += [x.replace("images","ss_mask") for x in imgB_train]
+        data["train"]["DS"] = ["syntheworld"]*len(data["train"]["IMG_A"])
+        imgB_val = available_images[int(0.8*n_images):]
+        data["val"]["IMG_B"] += imgB_val
+        data["val"]["IMG_A"] += [x.replace("images","pre_event") for x in imgB_val]
+        data["val"]["MSK"] += [x.replace("images","cd_mask") for x in imgB_val]
+        #data_flair["val"]["MSK_SEM"] += [x.replace("images","ss_mask") for x in imgB_val]
+        data["val"]["DS"] = ["syntheworld"]*len(data["val"]["IMG_A"])
+    data["test"] = data["val"]
+    return data
+
+def loadChangen(data_path, restr_train_set=False):
+    data = {"train":{"IMG_A":[], "IMG_B":[], "MSK":[]},
+                        "val":{"IMG_A":[], "IMG_B":[], "MSK":[]},}
+    available_images = glob.glob(f"{data_path}/t2_images/*.tif")
+    if restr_train_set:
+        available_images = available_images[:200]
+    n_images = len(available_images)
+    print("Total Images : {}".format(n_images))
+    imgB_train = available_images[:int(0.8*n_images)]
+    data["train"]["IMG_B"] += imgB_train
+    data["train"]["IMG_A"] += [x.replace("t2_images","t1_images") for x in imgB_train]
+    data["train"]["MSK"] += [x.replace("t2_images","t1_masks") for x in imgB_train]
+    #data["train"]["MSK_SEM"] += [x.replace("images","ss_mask") for x in imgB_train]
+    data["train"]["DS"] = ["changen"]*len(data["train"]["IMG_A"])
+    imgB_val = available_images[int(0.8*n_images):]
+    data["val"]["IMG_B"] += imgB_val
+    data["val"]["IMG_A"] += [x.replace("t2_images","t1_images") for x in imgB_val]
+    data["val"]["MSK"] += [x.replace("t2_images","t1_masks") for x in imgB_val]
+    #data["val"]["MSK_SEM"] += [x.replace("images","ss_mask") for x in imgB_val]
+    data["val"]["DS"] = ["changen"]*len(data["val"]["IMG_A"])
+    data["test"] = data["val"]
+    return data
+
+def loadFSC(data_path, fsc_versions=[], mix_fsc_versions=False, restr_train_set=False):
+    num_datasets = fsc_versions
+    data = {"train":{"IMG_A":[], "IMG_B":[], "MSK":[], "MSK_A":[]},
+                "val":{"IMG_A":[], "IMG_B":[], "MSK":[], "MSK_A":[]},
+                    }
+    for num in num_datasets:
+        available_images = glob.glob(data_path+"IMG{}/*.tif".format(num))
+        if restr_train_set:
+            available_images = available_images[:200]
+
+        n_images = len(available_images)
+        print("Total Images : {}".format(n_images))
+        imgB_train = available_images[:int(0.8*n_images)]
+        data["train"]["IMG_B"] += imgB_train
+        data["train"]["IMG_A"] += [x.replace("IMG{}".format(num),"IMG") for x in imgB_train]
+        data["train"]["MSK"] += [x.replace("IMG2_","LBL_").replace("IMG{}".format(num),"LBL{}".format(num)).replace("IMG_","LBL_") for x in imgB_train]
+        data["train"]["MSK_A"] += [""] * len(imgB_train)
+        data["train"]["DS"] = ["flair"]*len(data["train"]["IMG_A"])
+
+        imgB_val = available_images[int(0.8*n_images):]
+        data["val"]["IMG_B"] += imgB_val
+        data["val"]["IMG_A"] += [x.replace("IMG{}".format(num),"IMG") for x in imgB_val]
+        data["val"]["MSK"] += [x.replace("IMG2_","LBL_").replace("/IMG{}/".format(num),"/LBL{}/".format(num)).replace("IMG_","LBL_") for x in imgB_val]
+        data["val"]["MSK_A"] += [""] * len(imgB_val)
+        data["val"]["DS"] = ["flair"]*len(data["val"]["IMG_A"])
+    
+    if mix_fsc_versions:
+        for num,num2 in [(5,4), (5,6), (4,6)]:
+            available_images = glob.glob(data_path+"IMG{}/*.tif".format(num))
+            if restr_train_set:
+                available_images = available_images[:200]
+            n_images = len(available_images)
+            print("Total Images : {}".format(n_images))
+            imgB_train = available_images[:int(0.8*n_images)]
+            data["train"]["IMG_B"] += imgB_train
+            imgsA = [x.replace("/IMG{}/".format(num),"/IMG{}/".format(num2)).replace("IMG2_","IMG_") for x in imgB_train]
+            data["train"]["IMG_A"] += imgsA
+            data["train"]["MSK"] += [x.replace("IMG2_","LBL_").replace("/IMG{}/".format(num),"/LBL{}/".format(num)).replace("IMG_","LBL_") for x in imgB_train]
+            data["train"]["MSK_A"] += [x.replace("IMG2_","LBL_").replace("/IMG{}/".format(num2),"/LBL{}/".format(num2)).replace("IMG_","LBL_") for x in imgsA]
+            data["train"]["DS"] = ["flair"]*len(data["train"]["IMG_A"])
+
+            imgB_val = available_images[int(0.8*n_images):]
+            data["val"]["IMG_B"] += imgB_val
+            imgsA = [x.replace("/IMG{}/".format(num),"/IMG{}/".format(num2)).replace("IMG2_","IMG_") for x in imgB_val]
+            data["val"]["IMG_A"] += imgsA
+            data["val"]["MSK"] += [x.replace("IMG2_","LBL_").replace("/IMG{}/".format(num),"/LBL{}/".format(num)).replace("IMG_","LBL_") for x in imgB_val]
+            data["val"]["MSK_A"] += [x.replace("IMG2_","LBL_").replace("/IMG{}/".format(num2),"/LBL{}/".format(num2)).replace("IMG_","LBL_") for x in imgsA]
+            data["val"]["DS"] = ["flair"]*len(data["val"]["IMG_A"])
+    data["test"] = data["val"]
+    return data
 
 
 def DataDict(data_path = "", dataset_name=None, file_ext="png"):

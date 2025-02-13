@@ -25,6 +25,7 @@ def getArgs():
     parser.add_argument("--lr", default=0.001, type=float)
     parser.add_argument("--reducedLR", default=1, type=float)
     parser.add_argument("-l", "--local", action="store_true")
+    parser.add_argument("-bcd", "--binary", action="store_true")
     parser.add_argument("-mc", "--multiclass", action="store_true")
     parser.add_argument("--classes", default=2, type=int)
     parser.add_argument("--in_channels", default=5, type=int)
@@ -63,8 +64,6 @@ def getArgs():
     parser.add_argument("--new_n_classes", default=0, type=int)
     parser.add_argument("--reset_semantic_head", action="store_true")
     parser.add_argument("--reset_change_head", action="store_true")
-    parser.add_argument("--use_flair_classes", action="store_true")
-    parser.add_argument("--use_target_classes", action="store_true")
 
     parser.add_argument("--save_preds", action="store_true", default=False)
     parser.add_argument("--preds_folder", default="")
@@ -73,6 +72,7 @@ def getArgs():
 
     parser.add_argument("--crop256", action="store_true", default=False)
     parser.add_argument("--noSimilarityLoss", action="store_true")
+    parser.add_argument("--similarityLoss", action="store_true")
     parser.add_argument("--changeSimilarityLoss", action="store_true")
     parser.add_argument("--sgd", action="store_true", help="Use SGD rather than AdamW")
 
@@ -161,7 +161,7 @@ def main():
         if len((args.run_id).split("/"))>1:   # you can provide a path to a .ckpt file instead of a wandb run_id
             ckpt = args.run_id
             identifier += f"{ckpt},"
-            model = models.Lightning(in_channels=args.in_channels, doSemantics=not args.only_change, ignore_index=0, num_classes=args.classes, lr=args.lr,  args=args,)
+            model = models.Lightning(in_channels=args.in_channels, doSemantics=not args.binary, ignore_index=0, num_classes=args.classes, lr=args.lr,  args=args,)
             sd = torch.load(ckpt)
             model.model.load_state_dict(sd)
         else:
@@ -169,12 +169,12 @@ def main():
             ckpts.sort(key = lambda x:int(x.split("epoch=")[1].split("-")[0]))
             ckpt = ckpts[-1]
             identifier += f"{ckpt},"
-            model = models.Lightning.load_from_checkpoint(ckpt, doSemantics=not args.only_change, in_channels=args.in_channels, ignore_index=0, num_classes=args.classes, lr=args.lr, args=args, strict=False)
+            model = models.Lightning.load_from_checkpoint(ckpt, doSemantics=not args.binary, in_channels=args.in_channels, ignore_index=0, num_classes=args.classes, lr=args.lr, args=args, strict=False)
         print(f"Loading checkpoint : {ckpt}")
         
     else:
         identifier += f","
-        model = models.Lightning(in_channels=args.in_channels, doSemantics=not args.only_change, ignore_index=0, num_classes=args.classes, lr=args.lr, args=args)
+        model = models.Lightning(in_channels=args.in_channels, doSemantics=not args.binary, ignore_index=0, num_classes=args.classes, lr=args.lr, args=args)
         
     model.configure_losses()
     model.configure_metrics()
@@ -216,7 +216,7 @@ def main():
     imageLogger = models.ImagePredictionLoggerSemantic(val_samples, num_samples=len(val_samples["mask"]), log_every_n_epochs=args.log_images_every,  name="examples_target", class_mapping=class_mapping_val, norm_weights=norm_weights)
     callbacks = [checkpoint_callback, lr_monitor, imageLogger]
 
-    if (test_only_change or args.only_change) and ("test" in data_target):
+    if (test_only_change or args.binary) and ("test" in data_target):
         dm_only_change = dataset.LEVIR_DataModule(dict_train=data_target["test"], dict_val=data_target["test"], dict_test=data_target["test"], batch_size=min(args.batch, args.n_validation), num_channels=args.in_channels, isBinary=(not args.multiclass), class_mapping_to=class_mapping_to, dataset_name=args.mix_dataset, normalize=args.normalize, args=args)
         dm_only_change.prepare_data()
         dm_only_change.setup(stage="validate")
@@ -234,8 +234,8 @@ def main():
         if args.mix_dataset=="":
             dm_target = dm_train
         elif args.sequential:
-            model.configure_finetune(only_change=(test_only_change or args.only_change or args.train_only_change), freeze_encoder=args.freeze_encoder, freeze_decoder=args.freeze_decoder, new_n_classes=args.new_n_classes, reset_semantic_head=args.reset_semantic_head, reset_change_head=args.reset_change_head)
-        trainer_finetune = pyl.Trainer(accelerator=accelerator, strategy=strategy, devices=devices, logger=wandb_logger, callbacks=callbacks)
+            model.configure_finetune(only_change=(test_only_change or args.binary or args.train_only_change), freeze_encoder=args.freeze_encoder, freeze_decoder=args.freeze_decoder, new_n_classes=args.new_n_classes, reset_semantic_head=args.reset_semantic_head, reset_change_head=args.reset_change_head)
+        trainer_finetune = pyl.Trainer(accelerator=accelerator, logger=wandb_logger, callbacks=callbacks)
         dm_target.prepare_data()
         dm_target.setup(stage="validate")
 
@@ -268,9 +268,9 @@ def main():
                 limit_val_batches = 20000/len(data_train["val"]["IMG_A"])
                 print(f"limit_train_batches : {limit_train_batches:.2f}")
                 print(f"limit_val_batches : {limit_val_batches:.2f}")
-                trainer = pyl.Trainer(accelerator=accelerator, strategy=strategy, devices=devices, logger=wandb_logger,callbacks=callbacks, max_epochs=args.epochs, limit_train_batches=limit_train_batches, limit_val_batches=limit_val_batches)
+                trainer = pyl.Trainer(accelerator=accelerator, logger=wandb_logger,callbacks=callbacks, max_epochs=args.epochs, limit_train_batches=limit_train_batches, limit_val_batches=limit_val_batches)
             else:
-                trainer = pyl.Trainer(accelerator=accelerator, strategy=strategy, devices=devices, logger=wandb_logger,callbacks=callbacks, max_epochs=args.epochs)
+                trainer = pyl.Trainer(accelerator=accelerator, logger=wandb_logger,callbacks=callbacks, max_epochs=args.epochs)
             if args.resume:
                 trainer.fit(model=model, datamodule=dm_train, ckpt_path=ckpt)
             else:
@@ -285,12 +285,12 @@ def main():
 #
         
         if args.sequential:
-            model.configure_finetune(only_change=(test_only_change or args.only_change or args.train_only_change), freeze_encoder=args.freeze_encoder, freeze_decoder=args.freeze_decoder, new_n_classes=args.new_n_classes, reset_semantic_head=args.reset_semantic_head, reset_change_head=args.reset_change_head)
+            model.configure_finetune(only_change=(test_only_change or args.binary or args.train_only_change), freeze_encoder=args.freeze_encoder, freeze_decoder=args.freeze_decoder, new_n_classes=args.new_n_classes, reset_semantic_head=args.reset_semantic_head, reset_change_head=args.reset_change_head)
             print(f"Model only change : {model.train_only_change} {model.test_only_change}")
             if args.val_every>0:
-                trainer_finetune = pyl.Trainer(accelerator=accelerator, strategy=strategy, devices=devices, logger=wandb_logger, callbacks=callbacks, max_epochs=args.epochs_finetune, check_val_every_n_epoch=args.val_every)
+                trainer_finetune = pyl.Trainer(accelerator=accelerator, logger=wandb_logger, callbacks=callbacks, max_epochs=args.epochs_finetune, check_val_every_n_epoch=args.val_every)
             else:
-                trainer_finetune = pyl.Trainer(accelerator=accelerator, strategy=strategy, devices=devices, logger=wandb_logger, callbacks=callbacks, max_epochs=args.epochs_finetune)
+                trainer_finetune = pyl.Trainer(accelerator=accelerator, logger=wandb_logger, callbacks=callbacks, max_epochs=args.epochs_finetune)
             #if args.resume:
             #    trainer_finetune.fit(model=model, datamodule=dm_target, ckpt_path=ckpt)
             #else:
@@ -303,7 +303,7 @@ def main():
                 trainer_finetune.test(datamodule=dm_target, ckpt_path="last")
 
         elif args.no_pretrain:
-            trainer_finetune = pyl.Trainer(accelerator=accelerator, strategy=strategy, devices=devices, logger=wandb_logger, callbacks=callbacks)
+            trainer_finetune = pyl.Trainer(accelerator=accelerator, logger=wandb_logger, callbacks=callbacks)
             dm_target.prepare_data()
             dm_target.setup(stage="validate")
             try:
