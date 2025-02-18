@@ -228,11 +228,9 @@ def _update_config_from_file(config, cfg_file):
 
 
 def update_config(config, args):
-    _update_config_from_file(config, "vssm1/vssm_base_224.yaml")
+    _update_config_from_file(config, "configs/vssm_base_224.yaml")
 
     config.defrost()
-    if args.opts:
-        config.merge_from_list(args.opts)
 
     def _check_args(name):
         if hasattr(args, name) and eval(f'args.{name}'):

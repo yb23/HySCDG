@@ -394,7 +394,6 @@ class Fit_Dataset(Dataset):
         self.use_target_classes = (class_mapping_to is not None)
         self.num_classes = num_classes
         self.binary = isBinary
-        print(self.binary)
         self.num_channels = num_channels
         self.use_augmentations = use_augmentations
         self.use_inversion = use_inversion or use_augmentations or augment_first_image
@@ -422,6 +421,7 @@ class Fit_Dataset(Dataset):
             self.inv_mapping = {val:key for (key,val) in self.class_mapping.items()}
         else:
             self.inv_mapping = None
+        
         
         
         self.crop256 = A.Compose([A.RandomCrop(256, 256, p=1.0)], additional_targets={'imageB': 'image', 'msk': 'mask'}, is_check_shapes=False)
@@ -529,10 +529,8 @@ class Fit_Dataset(Dataset):
             imgA = np.moveaxis(timgs["image"],2,0)
             imgB = np.moveaxis(timgs["imageB"],2,0)
             msk = np.moveaxis(timgs["msk"],2,0)
-
         if (self.use_target_classes and (ds in ["fsc","syntheworld","changen"])):
             msk[1:] = np.vectorize(self.getDict)(msk[1:])
-        
         if self.augment_first_image:
             timg = self.trfFirst(image = np.moveaxis(imgA,0,2))
             imgA = np.moveaxis(timg["image"],2,0)

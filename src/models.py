@@ -110,7 +110,7 @@ class Lightning(LightningModule):
             num_classes: int = self.hparams["num_classes"]
         self.seg_model = None
         if model_name == "unet":
-            self.model, self.seg_model = dualUNet.makeModel()
+            self.model, self.seg_model = dualUNet.makeModel(multiclass=(not args.binary), backbone="resnet50", pretrained=True, in_channels=in_channels, num_classes=num_classes)
         elif model_name=="mambaCD":
             self.model = mambaCD.makeModel(args)
         elif model_name=="scannet":

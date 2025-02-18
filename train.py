@@ -170,7 +170,7 @@ def main():
         if len((args.run_id).split("/"))>1:   # you can provide a path to a .ckpt file instead of a wandb run_id
             ckpt = args.run_id
             identifier += f"{ckpt},"
-            model = models.Lightning(in_channels=args.in_channels, doSemantics=not args.binary, ignore_index=0, num_classes=args.classes, lr=args.lr,  args=args, identifier=identifier)
+            model = models.Lightning(model_name=args.model, in_channels=args.in_channels, doSemantics=not args.binary, ignore_index=0, num_classes=args.classes, lr=args.lr,  args=args, identifier=identifier)
             sd = torch.load(ckpt)
             model.model.load_state_dict(sd)
         else:
@@ -178,12 +178,12 @@ def main():
             ckpts.sort(key = lambda x:int(x.split("epoch=")[1].split("-")[0]))
             ckpt = ckpts[-1]
             identifier += f"{ckpt},"
-            model = models.Lightning.load_from_checkpoint(ckpt, doSemantics=not args.binary, in_channels=args.in_channels, ignore_index=0, num_classes=args.classes, lr=args.lr, args=args, strict=False, identifier=identifier)
+            model = models.Lightning.load_from_checkpoint(ckpt, model_name=args.model, doSemantics=not args.binary, in_channels=args.in_channels, ignore_index=0, num_classes=args.classes, lr=args.lr, args=args, strict=False, identifier=identifier)
         print(f"Loading checkpoint : {ckpt}")
         
     else:
         identifier += f","
-        model = models.Lightning(in_channels=args.in_channels, doSemantics=not args.binary, ignore_index=0, num_classes=args.classes, lr=args.lr, args=args, identifier=identifier)
+        model = models.Lightning(model_name=args.model, in_channels=args.in_channels, doSemantics=not args.binary, ignore_index=0, num_classes=args.classes, lr=args.lr, args=args, identifier=identifier)
         
     model.configure_losses()
     model.configure_metrics()

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from MambaCD.classification.models.vmamba import VSSM, LayerNorm2d, VSSBlock, Permute
+from ...classification.models.vmamba import VSSM, LayerNorm2d, VSSBlock, Permute
 
 
 class ChangeDecoder(nn.Module):

@@ -1,15 +1,22 @@
 try:
-    from MambaCD.changedetection.models.STMambaSCD import STMambaSCD
-    from MambaCD.changedetection.configs.config import get_config
+    from .MambaCD.changedetection.models.STMambaSCD import STMambaSCD
+    from .MambaCD.changedetection.configs.config import get_config
 except:
     print("No MambaCD : Import error !")
 
+import torch
+import os
 
 def makeModel(args):
+    ckpt_url = "https://github.com/MzeroMiko/VMamba/releases/download/%23v2cls/vssm_base_0229_ckpt_epoch_237.pth"
+    if not os.path.isfile("checkpoints/vssm_base_0229_ckpt_epoch_237.pth"):
+        print(f"Downloading VMamba base checkpoint from {ckpt_url}. Saving into checkpoints/")
+        torch.hub.download_url_to_file("https://github.com/MzeroMiko/VMamba/releases/download/%23v2cls/vssm_base_0229_ckpt_epoch_237.pth","checkpoints/")
+
     config = get_config(args)
     model = STMambaSCD(output_cd = 2, 
                 output_clf = args.classes,
-                pretrained="pretrained/vssm_base_0229_ckpt_epoch_237.pth",
+                pretrained="checkpoints/vssm_base_0229_ckpt_epoch_237.pth",
                 patch_size=config.MODEL.VSSM.PATCH_SIZE, 
                 in_chans=args.in_channels, 
                 num_classes=args.classes, 
