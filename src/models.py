@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from .arch.scannet.models import SCanNet, ChangeSimilarity
 from .arch import mambaCD
 from .arch import dualUNet
+from .utils import get_hist, cal_kappa
 
 from scipy import stats as scipy_stats
 
@@ -27,6 +28,7 @@ from torchmetrics.classification import (Accuracy, FBetaScore, JaccardIndex, Pre
 from torchmetrics.wrappers import ClasswiseWrapper
 
 
+
     
 
 def computeSepKappa(histKappa, iou, num_classes=20):
@@ -41,7 +43,7 @@ def computeSepKappa(histKappa, iou, num_classes=20):
     sc = (np.diag(histKappa[1:,1:]) / (1e-12 + histKappa[1:,1:].sum(axis=0) + histKappa[1:,1:].sum(axis=1))).sum() / (num_classes - 1)
     scs = 0.5*(iou+sc)
     
-    kappa_n02 = sepKappa.cal_kappa(hist_n0)
+    kappa_n02 = cal_kappa(hist_n0)
     iu = np.diag(c2hist) / (c2hist.sum(1) + c2hist.sum(0) - np.diag(c2hist))
     IoU_fg = iu[1]
     IoU_mean2 = (iu[0] + iu[1]) / 2
@@ -67,9 +69,11 @@ class Lightning(LightningModule):
                         ignore_index: Optional[int] = None,   #### ignore_index pour les classes sémantiques -> mettre 0 pour Flair et HiUCD (unlabeled)
                         doSemantics=False,
                         args=None,
-                        freeze_encoder=False, freeze_decoder=False):
+                        freeze_encoder=False, freeze_decoder=False, identifier=""):
         super().__init__()
 
+        self.identifier = identifier
+        
         self.num_classes=num_classes
         self.weights = weights
         self.multiclass = (num_classes>2)
@@ -83,27 +87,13 @@ class Lightning(LightningModule):
         self.similarityLoss = args.similarityLoss
         self.useSGD = args.sgd
         self.reducedLR = args.reducedLR
-        self.map_classes_output = out_mapping is not None
         self.save_preds = args.save_preds
         if self.save_preds:
             self.preds_folder = args.preds_folder
             os.makedirs(f"{args.preds_folder}", exist_ok=True)
                         
-        if args.zero_shot and (self.num_classes<10) and (args.mix_dataset=="hiucd"):
-            self.num_classes_loss = 10
-            self.num_classes = self.num_classes_loss
-            self.hparams["num_classes"] = self.num_classes_loss
-            self.original_num_classes = num_classes
-        else:
-            self.num_classes_loss = 0
-        if self.map_classes_output:
-            print("Doing output mapping for semantic classes !")
-            max_key = max(out_mapping.keys())  
-            self.out_mapping = torch.zeros(max_key + 1, dtype=torch.long) 
-            for key, value in out_mapping.items():
-                self.out_mapping[key] = value
-            if not args.cpu:
-                self.out_mapping = self.out_mapping.to("cuda")
+        
+        self.num_classes_loss = 0
 
         self.hparams["model_name"] = model_name
         self.save_hyperparameters()
@@ -120,7 +110,7 @@ class Lightning(LightningModule):
             num_classes: int = self.hparams["num_classes"]
         self.seg_model = None
         if model_name == "unet":
-            self.model, self.seg_model = dualUNet.make_model()
+            self.model, self.seg_model = dualUNet.makeModel()
         elif model_name=="mambaCD":
             self.model = mambaCD.makeModel(args)
         elif model_name=="scannet":
@@ -198,12 +188,14 @@ class Lightning(LightningModule):
                 labels = None
             return y, labels
         
-        elif self.hparams["model"] in ["mambaCD","scannet"]:
+        elif self.hparams["model_name"] in ["mambaCD","scannet"]:
             return self.model(x[0],x[1])
 
     def configure_losses(self):
         loss = self.hparams["loss"]
         ignore_index = self.hparams["ignore_index"]
+        print("LOSSSSSSSSSSSSSSSS")
+        print(loss)
         if loss == "ce":
             ignore_value = -1000 if ignore_index is None else ignore_index
             if self.multiclass:
@@ -450,8 +442,7 @@ class Lightning(LightningModule):
 
         y_hat = torch.softmax(y_hat, dim=1)
         preds = y_hat.argmax(dim=1)
-        if test_only_change & multiclass & self.restrict_class_test:
-            preds = preds * ((y_sem1.argmax(dim=1)==self.limit_class_test[0]) | (y_sem2.argmax(dim=1)==self.limit_class_test[0]))
+        
         f1 = self.f1(preds, y[:,0])
         iou = self.jaccard(preds, y[:,0])
         acc = torchmetrics.functional.classification.binary_accuracy(preds, y[:,0], ignore_index=-1)  ###########
@@ -479,13 +470,13 @@ class Lightning(LightningModule):
             metrics_to_log(y_sem2_hard, y[:,2])  ###########
             self.log_dict({f"{k}_2": v for k, v in metrics_to_log.compute().items()}, sync_dist=True)
             if (step=="test") or (step=="val"):
-                self.histKappa += sepKappa.get_hist(y_sem1_hard.detach().cpu().numpy(), y[:,1].cpu().numpy(), self.num_classes)
-                self.histKappa += sepKappa.get_hist(y_sem2_hard.detach().cpu().numpy(), y[:,2].cpu().numpy(), self.num_classes)
+                self.histKappa += get_hist(y_sem1_hard.detach().cpu().numpy(), y[:,1].cpu().numpy(), self.num_classes)
+                self.histKappa += get_hist(y_sem2_hard.detach().cpu().numpy(), y[:,2].cpu().numpy(), self.num_classes)
                 y_traj = (self.num_classes-1) * (y_sem1_hard-1) + y_sem2_hard
                 y_traj[(y_sem1_hard==0) | (y_sem2_hard==0) | (preds==0) | (y_traj<0)] = 0
                 y_traj_true = (self.num_classes-1) * (y[:,1]-1) + y[:,2]
                 y_traj_true[(y[:,0]==0) | (y_traj_true<0)] = 0
-                self.histKappa2 += sepKappa.get_hist(y_traj.detach().cpu().numpy(), y_traj_true.detach().cpu().numpy(), 1 + (self.num_classes-1)**2)
+                self.histKappa2 += get_hist(y_traj.detach().cpu().numpy(), y_traj_true.detach().cpu().numpy(), 1 + (self.num_classes-1)**2)
     
         return loss
     
@@ -503,9 +494,7 @@ class Lightning(LightningModule):
         self.log("train_IOU_total", iou, on_epoch=True, logger=True, prog_bar=True,sync_dist=True)
        
     def on_validation_epoch_end(self):
-        if self.extended_metrics:
-            with torch.no_grad():
-                self.log_cfm_roc("val")
+        
         tp, fp, fn, tn = self.cfm["val"]
         iou = tp / (tp + fp + fn)
         f1 = 1 / (1 + 0.5 * ( (fp + fn) / tp ))
@@ -543,10 +532,9 @@ class Lightning(LightningModule):
 
     def training_step(self, batch, batch_idx):
         image1, image2, y = batch["image1"], batch["image2"], batch["mask"]
-        model = self.hparams["model"]
+        model = self.hparams["model_name"]
         if model == "unet":
-            x = torch.cat([image1, image2], dim=1)
-            y_hat, y_sem = self(x)
+            y_hat, y_sem = self((image1, image2))
             y_sem1, y_sem2 = y_sem if y_sem is not None else (None, None)
 
         elif model == "changeformer":
@@ -555,17 +543,16 @@ class Lightning(LightningModule):
         elif model in ["mambaCD", "scannet"]:
             y_hat, y_sem1, y_sem2 = self((image1, image2))
       
-        loss = self.compute_metrics_and_loss(y_hat, y, y_sem1, y_sem2, test_only_change=self.train_only_change)
+        loss = self.compute_metrics_and_loss(y_hat, y, y_sem1, y_sem2, test_only_change=not self.doSemantics)
 
         
         return loss
 
     def validation_step(self, batch, batch_idx):
         image1, image2, y = batch["image1"], batch["image2"], batch["mask"]
-        model = self.hparams["model"]
+        model = self.hparams["model_name"]
         if model == "unet":
-            x = torch.cat([image1, image2], dim=1)
-            y_hat, y_sem = self(x)
+            y_hat, y_sem = self((image1, image2))
             y_sem1, y_sem2 = y_sem if y_sem is not None else (None, None)
 
         elif model == "changeformer":
@@ -574,17 +561,16 @@ class Lightning(LightningModule):
         elif model in ["mambaCD", "scannet"]:
             y_hat, y_sem1, y_sem2 = self((image1, image2))
         
-        loss = self.compute_metrics_and_loss(y_hat, y, y_sem1, y_sem2, step="val", test_only_change=self.train_only_change)
+        loss = self.compute_metrics_and_loss(y_hat, y, y_sem1, y_sem2, step="val", test_only_change=not self.doSemantics)
         return loss
 
         
 
     def test_step(self, batch, batch_idx):
         image1, image2, y = batch["image1"], batch["image2"], batch["mask"]
-        model = self.hparams["model"]
+        model = self.hparams["model_name"]
         if model == "unet":
-            x = torch.cat([image1, image2], dim=1)
-            y_hat, y_sem = self(x)
+            y_hat, y_sem = self((image1, image2))
             y_sem1, y_sem2 = y_sem if y_sem is not None else (None, None)
 
         elif model == "changeformer":
@@ -602,11 +588,8 @@ class Lightning(LightningModule):
                 image = Image.fromarray(img_preds,"RGB")
                 image.save(f"{self.preds_folder}/{paths[i].split('/')[-1]}")
                 
-        loss = self.compute_metrics_and_loss(y_hat, y, y_sem1, y_sem2, step="test", test_only_change=self.test_only_change)
+        loss = self.compute_metrics_and_loss(y_hat, y, y_sem1, y_sem2, step="test", test_only_change=not self.doSemantics)
 
         return loss
 
     
-
-      
-        

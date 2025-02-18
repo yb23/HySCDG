@@ -6,7 +6,7 @@ import wandb
 from torchvision.utils import make_grid
 from pytorch_lightning.utilities import rank_zero_only
 from pytorch_lightning import Callback
-from utils import convert_to_color
+from .utils import convert_to_color
 
 class ImagePredictionLoggerSemantic(Callback):
     def __init__(self, val_samples, num_samples=8, log_every_n_epochs=10, name="examples", class_mapping=None, norm_weights=None):
@@ -33,11 +33,10 @@ class ImagePredictionLoggerSemantic(Callback):
     def on_validation_epoch_end(self, trainer, pl_module):
         if pl_module.current_epoch % self.log_every_n_epochs == 0:
             with torch.no_grad():
-                if pl_module.hparams["model"] in ["mambaCD","scannet"]:
+                if pl_module.hparams["model_name"] in ["mambaCD","scannet"]:
                     y_hat, y_sem1, y_sem2 = pl_module((self.val_imgsA.to(device=pl_module.device), self.val_imgsB.to(device=pl_module.device)))
                 else:
-                    x = torch.cat([self.val_imgsA.to(device=pl_module.device), self.val_imgsB.to(device=pl_module.device)], dim=1)
-                    y_hat, y_sem = pl_module(x)
+                    y_hat, y_sem = pl_module((self.val_imgsA.to(device=pl_module.device), self.val_imgsB.to(device=pl_module.device)))
                     y_sem1, y_sem2 = y_sem
                 logits, logits1, logits2 = torch.softmax(y_hat, dim=1), torch.softmax(y_sem1, dim=1), torch.softmax(y_sem2, dim=1)
                 preds = logits.argmax(dim=1)
@@ -89,10 +88,10 @@ class ImagePredictionLogger(Callback):
             val_labels = self.val_labels.to(device=pl_module.device)
             # Get model prediction
             with torch.no_grad():
-                if pl_module.hparams["model"] in ["mambaCD","scannet"]:
+                if pl_module.hparams["model_name"] in ["mambaCD","scannet"]:
                     y_hat, y_sem1, y_sem2 = pl_module([val_imgsA, val_imgsB])
                 else:
-                    y_hat, y_sem = pl_module(torch.cat([val_imgsA, val_imgsB], dim=1))
+                    y_hat, y_sem = pl_module((val_imgsA, val_imgsB))
                     y_sem1 = y_sem, y_sem2 if y_sem is not None else (None, None)
                 
                 logits = torch.softmax(y_hat, dim=1)

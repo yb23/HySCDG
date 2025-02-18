@@ -259,14 +259,14 @@ def loadFSC(data_path, fsc_versions=[], mix_fsc_versions=False, restr_train_set=
         data["train"]["IMG_A"] += [x.replace("IMG{}".format(num),"IMG") for x in imgB_train]
         data["train"]["MSK"] += [x.replace("IMG2_","LBL_").replace("IMG{}".format(num),"LBL{}".format(num)).replace("IMG_","LBL_") for x in imgB_train]
         data["train"]["MSK_A"] += [""] * len(imgB_train)
-        data["train"]["DS"] = ["flair"]*len(data["train"]["IMG_A"])
+        data["train"]["DS"] = ["fsc"]*len(data["train"]["IMG_A"])
 
         imgB_val = available_images[int(0.8*n_images):]
         data["val"]["IMG_B"] += imgB_val
         data["val"]["IMG_A"] += [x.replace("IMG{}".format(num),"IMG") for x in imgB_val]
         data["val"]["MSK"] += [x.replace("IMG2_","LBL_").replace("/IMG{}/".format(num),"/LBL{}/".format(num)).replace("IMG_","LBL_") for x in imgB_val]
         data["val"]["MSK_A"] += [""] * len(imgB_val)
-        data["val"]["DS"] = ["flair"]*len(data["val"]["IMG_A"])
+        data["val"]["DS"] = ["fsc"]*len(data["val"]["IMG_A"])
     
     if mix_fsc_versions:
         for num,num2 in [(5,4), (5,6), (4,6)]:
@@ -281,7 +281,7 @@ def loadFSC(data_path, fsc_versions=[], mix_fsc_versions=False, restr_train_set=
             data["train"]["IMG_A"] += imgsA
             data["train"]["MSK"] += [x.replace("IMG2_","LBL_").replace("/IMG{}/".format(num),"/LBL{}/".format(num)).replace("IMG_","LBL_") for x in imgB_train]
             data["train"]["MSK_A"] += [x.replace("IMG2_","LBL_").replace("/IMG{}/".format(num2),"/LBL{}/".format(num2)).replace("IMG_","LBL_") for x in imgsA]
-            data["train"]["DS"] = ["flair"]*len(data["train"]["IMG_A"])
+            data["train"]["DS"] = ["fsc"]*len(data["train"]["IMG_A"])
 
             imgB_val = available_images[int(0.8*n_images):]
             data["val"]["IMG_B"] += imgB_val
@@ -289,7 +289,7 @@ def loadFSC(data_path, fsc_versions=[], mix_fsc_versions=False, restr_train_set=
             data["val"]["IMG_A"] += imgsA
             data["val"]["MSK"] += [x.replace("IMG2_","LBL_").replace("/IMG{}/".format(num),"/LBL{}/".format(num)).replace("IMG_","LBL_") for x in imgB_val]
             data["val"]["MSK_A"] += [x.replace("IMG2_","LBL_").replace("/IMG{}/".format(num2),"/LBL{}/".format(num2)).replace("IMG_","LBL_") for x in imgsA]
-            data["val"]["DS"] = ["flair"]*len(data["val"]["IMG_A"])
+            data["val"]["DS"] = ["fsc"]*len(data["val"]["IMG_A"])
     data["test"] = data["val"]
     return data
 
@@ -310,6 +310,7 @@ def DataDict(data_path = "", dataset_name=None, file_ext="png"):
     imgsA_ = glob.glob(data_path + f"test/A/*.{file_ext}", recursive=True)
     if len(imgsA)>0 and len(imgsA_)>0:
         print("Validation and test set available")
+        specific_from = "test"
         imgsB = [x.replace("/A/","/B/") for x in imgsA]
         lbls = [x.replace("/A/","/label/") for x in imgsA]
         dict_val["IMG_A"] = imgsA
@@ -345,6 +346,7 @@ def DataDict(data_path = "", dataset_name=None, file_ext="png"):
                                
     else:   ## No val, No test
         print("No validation set, no test set")
+        specific_from = "train"
         imgsA = dict_train["IMG_A"]
         n = len(imgsA)
         n1 = int(0.8*n)
@@ -392,6 +394,7 @@ class Fit_Dataset(Dataset):
         self.use_target_classes = (class_mapping_to is not None)
         self.num_classes = num_classes
         self.binary = isBinary
+        print(self.binary)
         self.num_channels = num_channels
         self.use_augmentations = use_augmentations
         self.use_inversion = use_inversion or use_augmentations or augment_first_image

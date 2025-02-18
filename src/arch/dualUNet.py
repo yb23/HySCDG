@@ -37,7 +37,7 @@ SegmentationModel.forward = new_forward
 import segmentation_models_pytorch as smp
 
 
-def makeModel(multiclass=True, backbone="resnet", pretrained=True, in_channels=3, num_classes=20):
+def makeModel(multiclass=True, backbone="resnet50", pretrained=True, in_channels=3, num_classes=20):
     model = smp.Unet(encoder_name=backbone, encoder_weights="imagenet" if pretrained else None, in_channels=in_channels * 2, classes=2,)
     
     if multiclass:

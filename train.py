@@ -3,6 +3,7 @@ warnings.filterwarnings('ignore')
 
 from src import models
 from src import dataset
+from src.callbacks import ImagePredictionLoggerSemantic, ImagePredictionLogger
 
 import argparse
 import pytorch_lightning as pyl
@@ -30,9 +31,9 @@ def getArgs():
     parser.add_argument("--classes", default=2, type=int)
     parser.add_argument("--in_channels", default=5, type=int)
     parser.add_argument("--n_validation", default=12, type=int, help="Number of images to log during validation step")
+    parser.add_argument("--logdir", default="", help="Logging directory (wandb and checkpoints)")
     parser.add_argument("--val_every", default=0, type=int)
     parser.add_argument("--log_images_every", default=2, type=int, help="Log images every x epochs")
-    parser.add_argument("--restr_train_set", action="store_true", help="Restrict train set to 200 items for debugging")
     parser.add_argument("--cpu", action="store_true", help="Run on cpu")
     parser.add_argument("--n_workers", default=8, type=int)
 
@@ -42,6 +43,9 @@ def getArgs():
     parser.add_argument("--pretrain_path", default="", help="Pretraining dataset root path")
     parser.add_argument("--target_path", default="", help="Target dataset root path")
 
+    parser.add_argument("--restr_train_set", action="store_true", help="Restrict train set to 200 items for debugging")
+    parser.add_argument("--fsc_versions", nargs='+', type=int, default=[3])
+    parser.add_argument("--mix_fsc_versions", action="store_true", help="Combine generated images from different fsc versions to add 'synthetic / synthetic' pairs")
 
     parser.add_argument("--mixed", action="store_true", help="Run a mixed training")
     parser.add_argument("--mix_ratio", default=0.5, type=float, help="Proportion of target elements in the pretraining dataset (only for mixed training)")
@@ -104,9 +108,14 @@ def main():
 
     accelerator = "cpu" if args.cpu else "cuda"
 
-
-    if args.pretrain_name != "":
-        data_pretrain = dataset.loadPretrainData(args)
+    if args.pretrain_name == "fsc":
+        data_pretrain = dataset.loadFSC(args.pretrain_path, fsc_versions=args.fsc_versions, mix_fsc_versions=args.mix_fsc_versions, restr_train_set=args.restr_train_set)
+    elif args.pretrain_name == "changen":
+        data_pretrain = dataset.loadChangen(args.pretrain_path, restr_train_set=args.restr_train_set)
+    elif args.pretrain_name == "syntheworld":
+        data_pretrain = dataset.loadSyntheWorld(args.pretrain_path, restr_train_set=args.restr_train_set)
+    #if args.pretrain_name != "":
+        #data_pretrain = dataset.loadPretrainData(args)
 
     print("Total Images Train : {}".format(len(data_pretrain["train"]["IMG_A"])))
     print("Total Images Val : {}".format(len(data_pretrain["val"]["IMG_A"])))
@@ -161,7 +170,7 @@ def main():
         if len((args.run_id).split("/"))>1:   # you can provide a path to a .ckpt file instead of a wandb run_id
             ckpt = args.run_id
             identifier += f"{ckpt},"
-            model = models.Lightning(in_channels=args.in_channels, doSemantics=not args.binary, ignore_index=0, num_classes=args.classes, lr=args.lr,  args=args,)
+            model = models.Lightning(in_channels=args.in_channels, doSemantics=not args.binary, ignore_index=0, num_classes=args.classes, lr=args.lr,  args=args, identifier=identifier)
             sd = torch.load(ckpt)
             model.model.load_state_dict(sd)
         else:
@@ -169,12 +178,12 @@ def main():
             ckpts.sort(key = lambda x:int(x.split("epoch=")[1].split("-")[0]))
             ckpt = ckpts[-1]
             identifier += f"{ckpt},"
-            model = models.Lightning.load_from_checkpoint(ckpt, doSemantics=not args.binary, in_channels=args.in_channels, ignore_index=0, num_classes=args.classes, lr=args.lr, args=args, strict=False)
+            model = models.Lightning.load_from_checkpoint(ckpt, doSemantics=not args.binary, in_channels=args.in_channels, ignore_index=0, num_classes=args.classes, lr=args.lr, args=args, strict=False, identifier=identifier)
         print(f"Loading checkpoint : {ckpt}")
         
     else:
         identifier += f","
-        model = models.Lightning(in_channels=args.in_channels, doSemantics=not args.binary, ignore_index=0, num_classes=args.classes, lr=args.lr, args=args)
+        model = models.Lightning(in_channels=args.in_channels, doSemantics=not args.binary, ignore_index=0, num_classes=args.classes, lr=args.lr, args=args, identifier=identifier)
         
     model.configure_losses()
     model.configure_metrics()
@@ -195,46 +204,29 @@ def main():
             print("No pretrain -> class_mapping_to=None")
         dm_target = dataset.LEVIR_DataModule(dict_train=data_target["train"], dict_val=data_target["val"], dict_test=data_target["test"], batch_size=args.batch, num_channels=args.in_channels, isBinary=(not args.multiclass), num_workers=args.n_workers, use_augmentations=args.augment, class_mapping_to=class_mapping_to, augment_first_image=False, crop256=args.crop256, dataset_name=args.target_name, normalize=args.normalize, args=args)
 
-    ### Preparation of callbacks
-    checkpoint_callback = ModelCheckpoint(
-        monitor='val_F1_total',  # Replace with your validation metric
-        mode='max',          # 'min' if the metric should be minimized (e.g., loss), 'max' for maximization (e.g., accuracy)
-        save_top_k=1,        # Save top k checkpoints based on the monitored metric
-        save_last=True,      # Save the last checkpoint at the end of training
-        filename='{epoch}-{val_F1_total:.3f}'  # Checkpoint file naming pattern
-    )
+
 
     lr_monitor = LearningRateMonitor(logging_interval='step')
-    if (args.use_flair_classes) or ((args.use_target_classes_ft) & (args.no_pretrain)):
-        class_mapping_val = None
-    else:
-        class_mapping_val = dm_target_val.val_dataset.inv_mapping
+    
     if args.normalize:
         norm_weights = dataset.norm_params[args.target_name] if args.target_name!="" else dataset.norm_params[args.pretrain_name]
     else:
         norm_weights = None
-    imageLogger = models.ImagePredictionLoggerSemantic(val_samples, num_samples=len(val_samples["mask"]), log_every_n_epochs=args.log_images_every,  name="examples_target", class_mapping=class_mapping_val, norm_weights=norm_weights)
-    callbacks = [checkpoint_callback, lr_monitor, imageLogger]
+    imageLogger = ImagePredictionLoggerSemantic(val_samples, num_samples=len(val_samples["mask"]), log_every_n_epochs=args.log_images_every,  name="examples_target", norm_weights=norm_weights)
+    callbacks = [lr_monitor, imageLogger]
 
-    if (test_only_change or args.binary) and ("test" in data_target):
+    if (args.binary) and ("test" in data_target):
         dm_only_change = dataset.LEVIR_DataModule(dict_train=data_target["test"], dict_val=data_target["test"], dict_test=data_target["test"], batch_size=min(args.batch, args.n_validation), num_channels=args.in_channels, isBinary=(not args.multiclass), class_mapping_to=class_mapping_to, dataset_name=args.mix_dataset, normalize=args.normalize, args=args)
         dm_only_change.prepare_data()
         dm_only_change.setup(stage="validate")
         val_samples_only_change = next(iter(dm_only_change.val_dataloader()))
-        callbacks += [models.ImagePredictionLogger(val_samples_only_change, num_samples=len(val_samples_only_change["mask"]), log_every_n_epochs=args.log_images_every, name="examples_target_change")]        
+        callbacks += [ImagePredictionLogger(val_samples_only_change, num_samples=len(val_samples_only_change["mask"]), log_every_n_epochs=args.log_images_every, name="examples_target_change")]        
     
-    if args.val_on_flair:
-        dm_flair_val = dataset.LEVIR_DataModule(dict_train=data_flair["val"], dict_val=data_flair["val"], dict_test=data_flair["val"], batch_size=min(args.batch, args.n_validation), num_channels=args.in_channels, isBinary=(not args.multiclass), augment_first_image=args.augment, class_mapping_to=class_mapping_to, use_target_classes=args.use_target_classes, dataset_name="flair", normalize=args.normalize, args=args)
-        dm_flair_val.prepare_data()
-        dm_flair_val.setup(stage="validate")
-        val_samples_flair = next(iter(dm_flair_val.val_dataloader()))
-        callbacks += [models.ImagePredictionLoggerSemantic(val_samples_flair, num_samples=len(val_samples_flair["mask"]), log_every_n_epochs=args.log_images_every, name="examples_flair", norm_weights=norm_weights_flair)]        
-
     if args.only_test:
         if args.mix_dataset=="":
             dm_target = dm_train
         elif args.sequential:
-            model.configure_finetune(only_change=(test_only_change or args.binary or args.train_only_change), freeze_encoder=args.freeze_encoder, freeze_decoder=args.freeze_decoder, new_n_classes=args.new_n_classes, reset_semantic_head=args.reset_semantic_head, reset_change_head=args.reset_change_head)
+            model.configure_finetune(only_change=args.binary, freeze_encoder=args.freeze_encoder, freeze_decoder=args.freeze_decoder, new_n_classes=args.new_n_classes, reset_semantic_head=args.reset_semantic_head, reset_change_head=args.reset_change_head)
         trainer_finetune = pyl.Trainer(accelerator=accelerator, logger=wandb_logger, callbacks=callbacks)
         dm_target.prepare_data()
         dm_target.setup(stage="validate")
@@ -285,8 +277,7 @@ def main():
 #
         
         if args.sequential:
-            model.configure_finetune(only_change=(test_only_change or args.binary or args.train_only_change), freeze_encoder=args.freeze_encoder, freeze_decoder=args.freeze_decoder, new_n_classes=args.new_n_classes, reset_semantic_head=args.reset_semantic_head, reset_change_head=args.reset_change_head)
-            print(f"Model only change : {model.train_only_change} {model.test_only_change}")
+            model.configure_finetune(only_change=args.binary, freeze_encoder=args.freeze_encoder, freeze_decoder=args.freeze_decoder, new_n_classes=args.new_n_classes, reset_semantic_head=args.reset_semantic_head, reset_change_head=args.reset_change_head)
             if args.val_every>0:
                 trainer_finetune = pyl.Trainer(accelerator=accelerator, logger=wandb_logger, callbacks=callbacks, max_epochs=args.epochs_finetune, check_val_every_n_epoch=args.val_every)
             else:

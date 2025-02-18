@@ -55,3 +55,26 @@ def convert_to_color(arr_2d: np.ndarray, palette: dict = lut_colors) -> np.ndarr
     return arr_3d
 
 
+def fast_hist(a, b, n):
+    k = (a >= 0) & (a < n)
+    return np.bincount(n * a[k].astype(int) + b[k], minlength=n ** 2).reshape(n, n)
+
+
+def get_hist(image, label, num_class):
+    hist = np.zeros((num_class, num_class))
+    hist += fast_hist(image.flatten(), label.flatten(), num_class)
+    return hist
+
+def cal_kappa(hist):
+    if hist.sum() == 0:
+        po = 0
+        pe = 1
+        kappa = 0
+    else:
+        po = np.diag(hist).sum() / hist.sum()
+        pe = np.matmul(hist.sum(1), hist.sum(0).T) / hist.sum() ** 2
+        if pe == 1:
+            kappa = 0
+        else:
+            kappa = (po - pe) / (1 - pe)
+    return kappa
