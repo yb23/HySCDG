@@ -29,7 +29,7 @@ def getArgs():
     parser.add_argument("-bcd", "--binary", action="store_true")
     parser.add_argument("-mc", "--multiclass", action="store_true")
     parser.add_argument("--classes", default=2, type=int)
-    parser.add_argument("--in_channels", default=5, type=int)
+    parser.add_argument("--in_channels", default=3, type=int)
     parser.add_argument("--n_validation", default=12, type=int, help="Number of images to log during validation step")
     parser.add_argument("--logdir", default="", help="Logging directory (wandb and checkpoints)")
     parser.add_argument("--val_every", default=0, type=int)
