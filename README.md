@@ -19,7 +19,7 @@ python train.py --sequential --no_pretrain --batch=8 -mc --classes=20 --in_chann
 ## Hybrid Semantic Change Dataset Generation
 
 ```
-python generate.py --model_path="path_to_inpainting_pipline/PIPE_38500" --controlnet_path="/home/YBenidir/Documents/CHECKPOINTS/ControlNewPrompts/checkpoint-58500/controlnet" --batch=1 --images_path="/home/YBenidir/Documents/DATASETS/FLAIR1/flair_aerial_train" --save_dir="../data/CHG" --prompts_path="../data/FLAIR_Prompts.csv" --dfobjects_path="../data/instancesFootprints.pkl" --num_version=15
+python generate.py --model_path="path_to_inpainting_pipeline/trained_pipeline" --controlnet_path="path_to_controlnet/trained_controlnet" --batch=1 --images_path="path_to_flair/flair_aerial_train" --save_dir="../data/CHG" --prompts_path="../data/FLAIR_Prompts.csv" --dfobjects_path="../data/instancesFootprints.pkl" --num_version=15
 ```
 
 **If you need to run the code on CPU**, simply add the --cpu flag.
