@@ -243,12 +243,11 @@ def loadChangen(data_path, restr_train_set=False):
     return data
 
 def loadFSC(data_path, fsc_versions=[], mix_fsc_versions=False, restr_train_set=False):
-    num_datasets = fsc_versions
-    data = {"train":{"IMG_A":[], "IMG_B":[], "MSK":[], "MSK_A":[]},
-                "val":{"IMG_A":[], "IMG_B":[], "MSK":[], "MSK_A":[]},
+    data = {"train":{"IMG_A":[], "IMG_B":[], "MSK":[], "MSK_A":[], "DS":[]},
+                "val":{"IMG_A":[], "IMG_B":[], "MSK":[], "MSK_A":[], "DS":[]},
                     }
-    for num in num_datasets:
-        available_images = glob.glob(data_path+"IMG{}/*.tif".format(num))
+    for num in fsc_versions:
+        available_images = glob.glob(data_path+"IMG{}/*.tif".format(num), recursive=True)
         if restr_train_set:
             available_images = available_images[:200]
 
@@ -257,39 +256,41 @@ def loadFSC(data_path, fsc_versions=[], mix_fsc_versions=False, restr_train_set=
         imgB_train = available_images[:int(0.8*n_images)]
         data["train"]["IMG_B"] += imgB_train
         data["train"]["IMG_A"] += [x.replace("IMG{}".format(num),"IMG") for x in imgB_train]
-        data["train"]["MSK"] += [x.replace("IMG2_","LBL_").replace("IMG{}".format(num),"LBL{}".format(num)).replace("IMG_","LBL_") for x in imgB_train]
+        data["train"]["MSK"] += [x.replace("IMG{}".format(num),"LBL{}".format(num)).replace("IMG_","LBL_") for x in imgB_train]
         data["train"]["MSK_A"] += [""] * len(imgB_train)
-        data["train"]["DS"] = ["fsc"]*len(data["train"]["IMG_A"])
+        data["train"]["DS"] += ["fsc"]*len(data["train"]["IMG_A"])
 
         imgB_val = available_images[int(0.8*n_images):]
         data["val"]["IMG_B"] += imgB_val
         data["val"]["IMG_A"] += [x.replace("IMG{}".format(num),"IMG") for x in imgB_val]
-        data["val"]["MSK"] += [x.replace("IMG2_","LBL_").replace("/IMG{}/".format(num),"/LBL{}/".format(num)).replace("IMG_","LBL_") for x in imgB_val]
+        data["val"]["MSK"] += [x.replace("/IMG{}/".format(num),"/LBL{}/".format(num)).replace("IMG_","LBL_") for x in imgB_val]
         data["val"]["MSK_A"] += [""] * len(imgB_val)
-        data["val"]["DS"] = ["fsc"]*len(data["val"]["IMG_A"])
+        data["val"]["DS"] += ["fsc"]*len(data["val"]["IMG_A"])
     
     if mix_fsc_versions:
-        for num,num2 in [(5,4), (5,6), (4,6)]:
-            available_images = glob.glob(data_path+"IMG{}/*.tif".format(num))
-            if restr_train_set:
-                available_images = available_images[:200]
-            n_images = len(available_images)
-            print("Total Images : {}".format(n_images))
-            imgB_train = available_images[:int(0.8*n_images)]
-            data["train"]["IMG_B"] += imgB_train
-            imgsA = [x.replace("/IMG{}/".format(num),"/IMG{}/".format(num2)).replace("IMG2_","IMG_") for x in imgB_train]
-            data["train"]["IMG_A"] += imgsA
-            data["train"]["MSK"] += [x.replace("IMG2_","LBL_").replace("/IMG{}/".format(num),"/LBL{}/".format(num)).replace("IMG_","LBL_") for x in imgB_train]
-            data["train"]["MSK_A"] += [x.replace("IMG2_","LBL_").replace("/IMG{}/".format(num2),"/LBL{}/".format(num2)).replace("IMG_","LBL_") for x in imgsA]
-            data["train"]["DS"] = ["fsc"]*len(data["train"]["IMG_A"])
+        for num in fsc_versions:
+            for num2 in fsc_versions:
+                if num2>num:
+                    available_images = glob.glob(data_path+"IMG{}/*.tif".format(num), recursive=True)
+                    if restr_train_set:
+                        available_images = available_images[:200]
+                    n_images = len(available_images)
+                    print("Total Images : {}".format(n_images))
+                    imgB_train = available_images[:int(0.8*n_images)]
+                    data["train"]["IMG_B"] += imgB_train
+                    imgsA = [x.replace("/IMG{}/".format(num),"/IMG{}/".format(num2)).replace("IMG2_","IMG_") for x in imgB_train]
+                    data["train"]["IMG_A"] += imgsA
+                    data["train"]["MSK"] += [x.replace("/IMG{}/".format(num),"/LBL{}/".format(num)).replace("IMG_","LBL_") for x in imgB_train]
+                    data["train"]["MSK_A"] += [x.replace("/IMG{}/".format(num2),"/LBL{}/".format(num2)).replace("IMG_","LBL_") for x in imgsA]
+                    data["train"]["DS"] += ["fsc"]*len(data["train"]["IMG_A"])
 
-            imgB_val = available_images[int(0.8*n_images):]
-            data["val"]["IMG_B"] += imgB_val
-            imgsA = [x.replace("/IMG{}/".format(num),"/IMG{}/".format(num2)).replace("IMG2_","IMG_") for x in imgB_val]
-            data["val"]["IMG_A"] += imgsA
-            data["val"]["MSK"] += [x.replace("IMG2_","LBL_").replace("/IMG{}/".format(num),"/LBL{}/".format(num)).replace("IMG_","LBL_") for x in imgB_val]
-            data["val"]["MSK_A"] += [x.replace("IMG2_","LBL_").replace("/IMG{}/".format(num2),"/LBL{}/".format(num2)).replace("IMG_","LBL_") for x in imgsA]
-            data["val"]["DS"] = ["fsc"]*len(data["val"]["IMG_A"])
+                    imgB_val = available_images[int(0.8*n_images):]
+                    data["val"]["IMG_B"] += imgB_val
+                    imgsA = [x.replace("/IMG{}/".format(num),"/IMG{}/".format(num2)).replace("IMG2_","IMG_") for x in imgB_val]
+                    data["val"]["IMG_A"] += imgsA
+                    data["val"]["MSK"] += [x.replace("IMG2_","LBL_").replace("/IMG{}/".format(num),"/LBL{}/".format(num)).replace("IMG_","LBL_") for x in imgB_val]
+                    data["val"]["MSK_A"] += [x.replace("IMG2_","LBL_").replace("/IMG{}/".format(num2),"/LBL{}/".format(num2)).replace("IMG_","LBL_") for x in imgsA]
+                    data["val"]["DS"] += ["fsc"]*len(data["val"]["IMG_A"])
     data["test"] = data["val"]
     return data
 
@@ -384,7 +385,7 @@ def DataDict(data_path = "", dataset_name=None, file_ext="png"):
 
 class Fit_Dataset(Dataset):
 
-    def __init__(self,dict_files,num_classes=2, isBinary=True, H=512, W=512, augment_first_image=False, use_augmentations=False, use_inversion=False, normalize=False, crop256=False, num_channels=5, dataset_name="fsc", class_mapping_to=None, args=None):
+    def __init__(self,dict_files,num_classes=2, isBinary=True, H=512, W=512, augment_first_image=False, use_augmentations=False, use_inversion=False, normalize=False, num_channels=3, dataset_name="fsc", class_mapping_to=None, args=None):
         self.list_imgsA = np.array(dict_files["IMG_A"])
         self.list_imgsB = np.array(dict_files["IMG_B"])
         self.list_msks = np.array(dict_files["MSK"])
@@ -400,7 +401,8 @@ class Fit_Dataset(Dataset):
         if self.use_inversion:
             print("Using random inversions")
         self.normalize = normalize
-        self.use_crop256 = crop256
+        self.use_crop256 = args.crop256
+        self.use_crop512 = args.crop512
 
         if "DS" in dict_files:
             self.list_dataset = np.array(dict_files["DS"])
@@ -518,6 +520,12 @@ class Fit_Dataset(Dataset):
             msk[1] = 0
             msk[2] = msk[0] * 1   # 1 corresponds to Flair building class
         
+        if self.use_crop512:
+            timgs = self.crop512(image=np.moveaxis(imgA,0,2), imageB=np.moveaxis(imgB,0,2), msk=np.moveaxis(msk,0,2))
+            imgA = np.moveaxis(timgs["image"],2,0)
+            imgB = np.moveaxis(timgs["imageB"],2,0)
+            msk = np.moveaxis(timgs["msk"],2,0)
+
         if self.use_crop256:
             timgs = self.crop256(image=np.moveaxis(imgA,0,2), imageB=np.moveaxis(imgB,0,2), msk=np.moveaxis(msk,0,2))
             imgA = np.moveaxis(timgs["image"],2,0)
@@ -565,7 +573,7 @@ class Fit_Dataset(Dataset):
 
 class LEVIR_DataModule(LightningDataModule):
 
-    def __init__(self,dict_train=None,dict_val=None,dict_test=None,num_workers=1,batch_size=2,drop_last=True,num_classes=2,num_channels=3, augment_first_image=False, use_augmentations=False, use_inversion=False, normalize=False, isBinary=True, dataset_name="fsc", class_mapping_to=None, crop256=False,args=None):
+    def __init__(self,dict_train=None,dict_val=None,dict_test=None,num_workers=1,batch_size=2,drop_last=True,num_classes=2,num_channels=3, augment_first_image=False, use_augmentations=False, use_inversion=False, normalize=False, isBinary=True, dataset_name="fsc", class_mapping_to=None, args=None):
         super().__init__()
         self.dict_train = dict_train
         self.dict_val = dict_val
@@ -584,7 +592,6 @@ class LEVIR_DataModule(LightningDataModule):
         self.dataset_name = dataset_name
         self.class_mapping_to = class_mapping_to
         self.augment_first_image = augment_first_image
-        self.crop256=crop256
         self.collate_fn = None
         self.args =args
         
@@ -601,7 +608,6 @@ class LEVIR_DataModule(LightningDataModule):
                 use_inversion = self.use_inversion,
                 normalize=self.normalize,
                 dataset_name=self.dataset_name, class_mapping_to=self.class_mapping_to,num_channels=self.num_channels,
-                crop256=self.crop256,
                 args=self.args)
 
             self.val_dataset = Fit_Dataset(

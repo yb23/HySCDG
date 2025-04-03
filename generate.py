@@ -70,7 +70,6 @@ class FLAIR_Dataset(Dataset):
         prompt_from_full_mask = True,
         save_inpainting_mask = False,
         inpaint_mask_save_path = "../data/CHG_New/LBL3/",
-        save_all=False,
         save_root="../data/GEN_SAMPLES2/",
         imgs_list=[]
     ):
@@ -84,7 +83,6 @@ class FLAIR_Dataset(Dataset):
         self.dfObjects = self.dfObjects[self.dfObjects["cledeb"].isin(["BATIMENT","TERRSPOR","POSTRANS","CONSLINE","RESERVOI","CONSSURF","CONSPONC"])]
         self.dfObjects[["xmin","ymin","xmax","ymax"]] = self.dfObjects.bounds
         self.dfObjects = self.dfObjects[self.dfObjects.area<250*250]
-        self.save_all = save_all
         self.save_root=save_root
         self.instance_data_root = Path(instance_data_root)
         if not self.instance_data_root.exists():
@@ -93,7 +91,7 @@ class FLAIR_Dataset(Dataset):
         self.labels_save_path = labels_save_path
         self.inpaint_mask_save_path = inpaint_mask_save_path
 
-        self.images_path = glob.glob(instance_data_root+"**/*.tif", recursive=True)
+        self.images_path = glob.glob(instance_data_root+"/**/*.tif", recursive=True)
         if len(imgs_list)>0:  # Choose only a list of image files to use for generation
             self.images_path = [x for x in self.images_path if x.split("/")[-1] in imgs_list]
        
@@ -125,16 +123,14 @@ class FLAIR_Dataset(Dataset):
 
     def __getitem__(self, index):
         example = {}
-        raster = rasterio.open(self.images_path[index % self.num_instance_images]) #Image.open(self.instance_images_path[index % self.num_instance_images])   
+        raster = rasterio.open(self.images_path[index % self.num_instance_images]) 
         ctrl = (rasterio.open(self.labels_path[index % self.num_instance_images]).read()).astype(np.uint8)
         image_id = self.image_ids[index % self.num_instance_images]
         instance_image = raster.read()[:self.image_channels]
-        print(instance_image.shape)
 
-        data1 = self.dfObjects[self.dfObjects["image_id"]==image_id]
-        area = None
+        data = self.dfObjects[self.dfObjects["image_id"]==image_id]
 
-        if len(data1)>0:
+        if len(data)>0:
             try:
                 if "largeur_de_chaussee" in data.columns:
                     data["geometrie"] = data.apply(lambda x:x["geometrie"].buffer(x["largeur_de_chaussee"]*0.5) if ((x["largeur_de_chaussee"] is not None) and (x["largeur_de_chaussee"]>0)) else x["geometrie"], axis=1).buffer(2)
@@ -142,10 +138,6 @@ class FLAIR_Dataset(Dataset):
                     data["geometrie"] = data["geometrie"].buffer(2)
                 data["area"] = data.area
                 data = data[data["area"]>0].sort_values("area", ascending=False).reset_index(drop=True)
-                #data["approxLength"] = data["geometrie"].length
-                #data["approxWidth"] = data["area"] / data["approxLength"]
-                #data["extension"] = data["approxLength"] / data["approxWidth"]
-                #data["notLinear"] = (data["extension"]<20)
                 n = len(data)
             except Exception as e:
                 print("Erreur : {}".format(e))
@@ -188,26 +180,10 @@ class FLAIR_Dataset(Dataset):
         if self.mask_blur and ((self.mask_blur_proportion==1) or (np.random.uniform()<=self.mask_blur_proportion)):
             mask = cv2.GaussianBlur(mask.astype(float), (199,199), 50)
         
-        #if chg_surface>20:
-        if self.save_all:
-            save_path = f"{self.save_root}{image_id}/"
-            os.makedirs(save_path, exist_ok=True)
-            flair.saveRaster(f"{save_path}LBL.tif", chg_map.astype(np.uint8), raster.transform)
-            flair.saveRaster(f"{save_path}MSK.tif", (mask*255).astype(np.uint8), raster.transform)
-            flair.saveRaster(f"{save_path}IMG.tif", instance_image,raster.transform, crs=raster.crs)
-
-            fig, ax = plt.subplots(figsize=(10, 10))
-            plt.axis("off")
-            extent = [raster.bounds.left, raster.bounds.right, raster.bounds.bottom, raster.bounds.top]
-            ax.imshow(np.moveaxis(instance_image[:3],0,2), extent=extent, cmap='gray')  # Afficher en niveaux de gris
-            data1['color'] = np.random.choice(['blue', 'green', 'purple', 'orange', 'pink'], size=len(data1))
-            data1.plot(ax=ax, column="color", edgecolor="black", alpha=0.3, linewidth=2)
-            plt.savefig(f"{save_path}INS.png", format="png", dpi=300, bbox_inches="tight")
-            plt.show()
-        else:
-            flair.saveRaster(self.labels_save_path + "{}.tif".format(image_id.replace("IMG","LBL")), chg_map.astype(np.uint8), raster.transform)
-            if self.save_inpainting_mask:
-                flair.saveRaster(self.inpaint_mask_save_path + "{}.tif".format(image_id.replace("IMG","MSK")), (mask*255).astype(np.uint8), raster.transform)
+    
+        flair.saveRaster(self.labels_save_path + "{}.tif".format(image_id.replace("IMG","LBL")), chg_map.astype(np.uint8), raster.transform)
+        if self.save_inpainting_mask:
+            flair.saveRaster(self.inpaint_mask_save_path + "{}.tif".format(image_id.replace("IMG","MSK")), (mask*255).astype(np.uint8), raster.transform)
 
         if self.doOneHot:
             example["instance_labels"] = torch.moveaxis(F.one_hot(torch.Tensor(ctrl1[0]-1).to(torch.long), num_classes=self.num_classes),2,0)
@@ -215,12 +191,9 @@ class FLAIR_Dataset(Dataset):
             instance_label = np.moveaxis(flair.convert_to_color(ctrl1[0]),2,0)
             example["instance_labels"] = torch.Tensor(instance_label/255.0)  
 
-        if self.image_channels == 3:
-            instance_image = instance_image[:3]
-        print(instance_image.shape)
-        #instance_image = self.image_transforms_resize_and_crop(instance_image) ##############################################""
+        instance_image = instance_image[:self.image_channels]
         example["raster"] = raster
-        example["instance_image"] = torch.Tensor((instance_image / 255.)) #####################  self.image_transforms(instance_image)
+        example["instance_image"] = torch.Tensor((instance_image / 255.))
         example["mask"] = torch.Tensor(mask)
         example["image_id"] = image_id
         example["prompt"] = prompt
@@ -255,24 +228,20 @@ def loadModel(device="cuda", model_path="/home/YBenidir/Documents/CHECKPOINTS/SD
 
 
 def generateImages(args):
-    SAVE_ROOT = args.save_dir + "/IMG{}/".format(args.num_version)
+    SAVE_ROOT = f"{args.save_dir}/IMG{args.num_version}/"
+    os.makedirs(SAVE_ROOT, exist_ok=True)
+    os.makedirs(f"{args.save_dir}/LBL{args.num_version}/", exist_ok=True)
+    if args.save_masks:
+        os.makedirs(f"{args.save_dir}/MSK{args.num_version}/", exist_ok=True)
 
     device = "cpu" if args.cpu else "cuda"
 
     already_imgs = glob.glob(SAVE_ROOT + "*.tif")
     already_imgs = [x.split("/")[-1] for x in already_imgs]
 
-    """
-    train_dataset = DreamBoothDataset(
-        instance_data_root=args.instance_data_dir,
-        prompts_path=args.prompts_path,
-        num_classes=args.num_classes,
-        already_imgs = set(already_imgs)
-    )
-    """
 
     train_dataset = FLAIR_Dataset(
-        instance_data_root=args.instance_data_dir,
+        instance_data_root=args.images_path,
         prompts_path=args.prompts_path,
         num_classes=args.num_classes,
         image_channels=3,
@@ -290,8 +259,8 @@ def generateImages(args):
         train_dataset,
         shuffle=False,
         collate_fn=collate_fn,
-        batch_size=args.train_batch_size,
-        num_workers=args.dataloader_num_workers
+        batch_size=args.batch,
+        num_workers=args.n_workers
     )
 
     pipe = loadModel(device=device, model_path=args.model_path, controlnet_path=args.controlnet_path)
@@ -323,83 +292,26 @@ if __name__ == "__main__":
         help="Path to pretrained controlnet model or model identifier from huggingface.co/models."
         " If not specified controlnet weights are initialized from unet.",
     )
-    parser.add_argument(
-        "--revision",
-        type=str,
-        default=None,
-        required=False,
-        help="Revision of pretrained model identifier from huggingface.co/models.",
-    )
-    parser.add_argument(
-        "--variant",
-        type=str,
-        default=None,
-        help="Variant of the model files of the pretrained model identifier from huggingface.co/models, 'e.g.' fp16",
-    )
-    parser.add_argument(
-        "--train_batch_size", type=int, default=4, help="Batch size (per device) for the training dataloader."
-    )
-    parser.add_argument(
-        "--dataloader_num_workers",
-        type=int,
-        default=0,
-        help=(
-            "Number of subprocesses to use for data loading. 0 means that the data will be loaded in the main process."
-        ),
-    )
-    parser.add_argument(
-        "--instance_data_dir",
-        type=str,
-        default="../data/CHG/IMG/",  # "/gpfsscratch/rech/jrj/uhz23wx/GENERATED_DATASETS/CHG/IMG/"
-        help=(
-            "A folder containing the training data. Folder contents must follow the structure described in"
-            " https://huggingface.co/docs/datasets/image_dataset#imagefolder. In particular, a `metadata.jsonl` file"
-            " must exist to provide the captions for the images. Ignored if `dataset_name` is specified."
-        ),
-    )
-    parser.add_argument(
-        "--save_dir",
-        type=str,
-        default="../data/CHG/",  # "/gpfsscratch/rech/jrj/uhz23wx/GENERATED_DATASETS/CHG/IMG/"
-        help=(
-            "A folder containing the training data. Folder contents must follow the structure described in"
-            " https://huggingface.co/docs/datasets/image_dataset#imagefolder. In particular, a `metadata.jsonl` file"
-            " must exist to provide the captions for the images. Ignored if `dataset_name` is specified."
-        ),
-    )
-    parser.add_argument(
-        "--prompts_path",
-        type=str,
-        default="../data/Flair_BigPrompts.csv",   #  # "/gpfsscratch/rech/jrj/uhz23wx/GENERATED_DATASETS/CHG/IMG/Flair_BigPrompts.csv"
-        help=(
-            ""
-        ),
-    )
-    parser.add_argument(
-        "--dfobjects_path",
-        type=str,
-        default="../data/bduniFlair.pkl",   #  # "/gpfsscratch/rech/jrj/uhz23wx/GENERATED_DATASETS/CHG/IMG/Flair_BigPrompts.csv"
-        help=(
-            ""
-        ),
-    )
-    parser.add_argument(   ###################################################################################################
-        "--cpu",
-        default=False,
-        action="store_true",
-        help="Flag to train on CPU.",
-    )
-    parser.add_argument("--conditioning_scale", type=float, default=1.0, help="")
-    parser.add_argument("--inference_steps", type=int, default=20, help="")
+    #python generate.py --model_path="/home/YBenidir/Documents/CHECKPOINTS/SD_MiniBatch/PIPE_38500" --controlnet_path="/home/YBenidir/Documents/CHECKPOINTS/ControlNewPrompts/checkpoint-58500/controlnet" --batch=1 --images_path="/home/YBenidir/Documents/DATASETS/FLAIR1/flair_aerial_train" --save_dir="../data/CHG/" --prompts_path="../data/Flair_Prompts.csv" --dfobjects_path="../data/instancesFootprints.pkl" --num_version=15
+    parser.add_argument("-b", "--batch", type=int, default=4, help="Batch size (per device) for the training dataloader.")
+    parser.add_argument("--n_workers",type=int,default=0,help="Number of subprocesses to use for data loading. 0 means that the data will be loaded in the main process.",)
+    
+    parser.add_argument("--images_path",type=str,default="../path_to_flair/flair_aerial_train/",
+                        help="Path to the FLAIR train images folder")
+    
+    parser.add_argument("--save_dir",type=str,default="../data/CHG/",help="Path to the folder where the generated images ands masks will be stored")
+    parser.add_argument("--prompts_path",type=str,default="../data/FLAIR_Prompts.csv",help="Path to the csv file containing the prompts for FLAIR images")
+    parser.add_argument("--dfobjects_path",type=str,default="../data/instancesFootprints.pkl", help="Path to the geopandas file (.pkl) containing the footprints of the instances that are inside the zone covered by FLAIR dataset")
+    parser.add_argument("--cpu",default=False,action="store_true",help="Train on CPU")
+    parser.add_argument("--conditioning_scale", type=float, default=1.0, help="For ControlNet")
+    parser.add_argument("--inference_steps", type=int, default=20, help="Number of denoising steps for Stable Diffusion")
 
     parser.add_argument("--num_classes", type=int, default=20, help="Number of semantic classes for the labels")
 
-    parser.add_argument("--num_version", type=int, default=3, help="To name the save folders for images and labels")
+    parser.add_argument("--num_version", type=int, default=15, help="To name the save folders for images and labels")
     parser.add_argument("--prompt_from_full_mask",default=False,action="store_true")
     parser.add_argument("--mask_blur",default=False,action="store_true")
     parser.add_argument("--mask_blur_proportion",default=1.0,type=float)
-    parser.add_argument("--mapping_path",type=str,default="/gpfswork/rech/jrj/commun/Metadata/FlairToFlairInc.csv")  #../data/FlairToFlairInc.csv
-    parser.add_argument("--flair",default=False,action="store_true")
     parser.add_argument("--save_masks",default=False,action="store_true")
 
     args = parser.parse_args()

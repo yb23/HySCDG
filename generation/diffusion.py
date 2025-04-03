@@ -2,9 +2,9 @@ import torch
 
 
 
-from diffusers import ControlNetModel#, StableDiffusionInpaintPipeline 
-from controlnet_inpaint import StableDiffusionControlNetInpaintPipeline
-from pipeline_inpaint import StableDiffusionInpaintPipeline
+from diffusers import ControlNetModel
+from .controlnet_inpaint import StableDiffusionControlNetInpaintPipeline
+from .pipeline_inpaint import StableDiffusionInpaintPipeline
 
 
 def loadControlNet(ControlNet_path="/home/YBenidir/Documents/CHECKPOINTS/ControlNet_V2_2024_01_16/controlnet", device="cuda"):

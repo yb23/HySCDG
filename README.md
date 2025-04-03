@@ -13,3 +13,13 @@ python train.py --sequential --batch=8 -mc --classes=20 --in_channels=3 --logdir
 ```
 python train.py --sequential --no_pretrain --batch=8 -mc --classes=20 --in_channels=3 --logdir=/my-folder/logs/ -p="MyWandbProject" --log_images_every=1 --model="unet" --pretrain_name="fsc" --pretrain_path=datasets/fsc-180k/ --fsc_versions 11 12 --mix_fsc_versions --epochs=0 --target_name="hiucd" --target_path=datasets/hiucd_mini_512/ --epochs_finetune=50 --new_n_classes=10 --run_id="WANDB_ID_OF_PRETRAINING_RUN"
 ```
+
+
+
+## Hybrid Semantic Change Dataset Generation
+
+```
+python generate.py --model_path="path_to_inpainting_pipline/PIPE_38500" --controlnet_path="/home/YBenidir/Documents/CHECKPOINTS/ControlNewPrompts/checkpoint-58500/controlnet" --batch=1 --images_path="/home/YBenidir/Documents/DATASETS/FLAIR1/flair_aerial_train" --save_dir="../data/CHG" --prompts_path="../data/FLAIR_Prompts.csv" --dfobjects_path="../data/instancesFootprints.pkl" --num_version=15
+```
+
+**If you need to run the code on CPU**, simply add the --cpu flag.

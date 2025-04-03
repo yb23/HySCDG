@@ -75,6 +75,7 @@ def getArgs():
     parser.add_argument("--seg_weight", default=1.0, type=float)
 
     parser.add_argument("--crop256", action="store_true", default=False)
+    parser.add_argument("--crop512", action="store_true", default=False)
     parser.add_argument("--noSimilarityLoss", action="store_true")
     parser.add_argument("--similarityLoss", action="store_true")
     parser.add_argument("--changeSimilarityLoss", action="store_true")
@@ -134,14 +135,14 @@ def main():
                 data_target["train"][key] = [data_target["train"][key][ii] for ii in idxs]
             print(f"Keeping only {len(data_target['train']['IMG_A'])} images ({100*args.target_max_proportion:.0f}%)")
         ### Datamodule for validation samples (only from target dataset)
-        dm_target_val = dataset.LEVIR_DataModule(dict_train=data_target["val"], dict_val=data_target["val"], dict_test=data_target["val"], batch_size=min(args.batch, args.n_validation), num_channels=args.in_channels, isBinary=(not args.multiclass), class_mapping_to=class_mapping_to, augment_first_image=args.augment, use_augmentations=args.augment, crop256=args.crop256, dataset_name=args.target_name, normalize=args.normalize, args=args)
+        dm_target_val = dataset.LEVIR_DataModule(dict_train=data_target["val"], dict_val=data_target["val"], dict_test=data_target["val"], batch_size=min(args.batch, args.n_validation), num_channels=args.in_channels, isBinary=(not args.multiclass), class_mapping_to=class_mapping_to, augment_first_image=args.augment, use_augmentations=args.augment, dataset_name=args.target_name, normalize=args.normalize, args=args)
         dm_target_val.prepare_data()
         dm_target_val.setup(stage="validate")
         val_samples = next(iter(dm_target_val.val_dataloader()))
 
     else:
         class_mapping_to = None
-        dm_target_val = dataset.LEVIR_DataModule(dict_train=data_pretrain["val"], dict_val=data_pretrain["val"], dict_test=data_pretrain["val"], batch_size=min(args.batch, args.n_validation), num_channels=args.in_channels, isBinary=(not args.multiclass), class_mapping_to=class_mapping_to, augment_first_image=args.augment, use_augmentations=args.augment, crop256=args.crop256, dataset_name=args.pretrain_name, normalize=args.normalize, args=args)
+        dm_target_val = dataset.LEVIR_DataModule(dict_train=data_pretrain["val"], dict_val=data_pretrain["val"], dict_test=data_pretrain["val"], batch_size=min(args.batch, args.n_validation), num_channels=args.in_channels, isBinary=(not args.multiclass), class_mapping_to=class_mapping_to, augment_first_image=args.augment, use_augmentations=args.augment, dataset_name=args.pretrain_name, normalize=args.normalize, args=args)
         dm_target_val.prepare_data()
         dm_target_val.setup(stage="validate")
         val_samples = next(iter(dm_target_val.val_dataloader()))
@@ -162,7 +163,7 @@ def main():
         data_train = data_pretrain
         ds_name = args.pretrain_name
     
-    dm_train = dataset.LEVIR_DataModule(dict_train=data_train["train"], dict_val=data_train["val"], dict_test=data_train["test"], batch_size=args.batch, num_channels=args.in_channels, isBinary=(not args.multiclass), num_workers=args.n_workers, class_mapping_to=class_mapping_to, augment_first_image=args.augment, use_augmentations=args.augment, crop256=args.crop256, dataset_name=ds_name, normalize=args.normalize, args=args)
+    dm_train = dataset.LEVIR_DataModule(dict_train=data_train["train"], dict_val=data_train["val"], dict_test=data_train["test"], batch_size=args.batch, num_channels=args.in_channels, isBinary=(not args.multiclass), num_workers=args.n_workers, class_mapping_to=class_mapping_to, augment_first_image=args.augment, use_augmentations=args.augment, dataset_name=ds_name, normalize=args.normalize, args=args)
 
 
     ### Initialization of the model
@@ -202,7 +203,7 @@ def main():
         if args.no_pretrain:
             class_mapping_to = None
             print("No pretrain -> class_mapping_to=None")
-        dm_target = dataset.LEVIR_DataModule(dict_train=data_target["train"], dict_val=data_target["val"], dict_test=data_target["test"], batch_size=args.batch, num_channels=args.in_channels, isBinary=(not args.multiclass), num_workers=args.n_workers, use_augmentations=args.augment, class_mapping_to=class_mapping_to, augment_first_image=False, crop256=args.crop256, dataset_name=args.target_name, normalize=args.normalize, args=args)
+        dm_target = dataset.LEVIR_DataModule(dict_train=data_target["train"], dict_val=data_target["val"], dict_test=data_target["test"], batch_size=args.batch, num_channels=args.in_channels, isBinary=(not args.multiclass), num_workers=args.n_workers, use_augmentations=args.augment, class_mapping_to=class_mapping_to, augment_first_image=False, dataset_name=args.target_name, normalize=args.normalize, args=args)
 
 
 
