@@ -1,5 +1,5 @@
 <div align="center">
-<h1>The Change You Want To Detect: Semantic Change Detection In Earth Observation With Hybrid Data Generation</h1>
+<h1>The Change You Want To Detect: Semantic Change Detection In Earth Observation With Hybrid Data Generation [CVPR 2025]</h1>
 
 <a href="https://arxiv.org/pdf/2503.15683" target="_blank" rel="noopener noreferrer">
   <img src="https://img.shields.io/badge/Paper-8A2BE2" alt="Paper PDF">
