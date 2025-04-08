@@ -16,6 +16,10 @@
 [Yanis Benidir](https://yb23.github.io/), [Nicolas Gonthier](https://ngonthier.github.io/), [Clément Mallet](https://www.umr-lastig.fr/clement-mallet/)
 </div>
 
+<br>
+**If you ❤️ or simply use this project, don't forget to give the repository a ⭐, it means a lot to us !**
+<br>
+
 ```bibtex
 @inproceedings{benidir2025cywd,
   title={The Change You Want To Detect: Semantic Change Detection In Earth Observation With Hybrid Data Generation},
