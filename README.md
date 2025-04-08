@@ -29,23 +29,33 @@
 
 This repository is the official implementation to run the experiment of "The Change You Want to Detect" paper. It can be used to run the transfert learning experiments and evaluation on 5 different change detection dataset but also to generate new pair of images with change
 
+## Quick Start
+
+First, clone this repository to your local machine, and install the dependencies (torch, torchvision, numpy, Pillow, and huggingface_hub). 
+
+```bash
+git clone git@github.com:yb23/HySCDG.git
+cd HySCDG
+pip install -r requirements.txt
+```
+
 ## Transfer Learning Experiments
 
 The following commands can fine-tune the pretrained change detection model for different transfer learning settings. 
 
-**Sequential mode : Pretraining + Fine-tuning**
+**Sequential mode: Pretraining + Fine-tuning**
 ```
 python train.py --sequential --batch=8 -mc --classes=20 --in_channels=3 --logdir=/my-folder/logs/ -p="MyWandbProject" --log_images_every=1 --model="unet" --pretrain_name="fsc" --pretrain_path=datasets/fsc-180k/ --fsc_versions 11 12 --mix_fsc_versions --epochs=10 --target_name="hiucd" --target_path=datasets/hiucd_mini_512/ --epochs_finetune=50 --new_n_classes=10
 ```
 
 
-**Sequential mode : Only Fine-tuning**
+**Sequential mode: Only Fine-tuning**
 ```
 python train.py --sequential --no_pretrain --batch=8 -mc --classes=20 --in_channels=3 --logdir=/my-folder/logs/ -p="MyWandbProject" --log_images_every=1 --model="unet" --pretrain_name="fsc" --pretrain_path=datasets/fsc-180k/ --fsc_versions 11 12 --mix_fsc_versions --epochs=0 --target_name="hiucd" --target_path=datasets/hiucd_mini_512/ --epochs_finetune=50 --new_n_classes=10 --run_id="WANDB_ID_OF_PRETRAINING_RUN"
 ```
 
 
-**Mixed mode : Pretraining x Fine-tuning**
+**Mixed mode: Pretraining x Fine-tuning**
 ```
 python train.py --mixed --mix_ratio=0.5 --batch=8 -mc --classes=10 --in_channels=3 --logdir=/my-folder/logs/ -p="MyWandbProject" --log_images_every=1 --model="unet" --pretrain_name="fsc" --pretrain_path=datasets/fsc-180k/ --fsc_versions 11 12 --mix_fsc_versions --epochs=10 --target_name="hiucd" --target_path=datasets/hiucd_mini_512/
 ```
@@ -74,7 +84,7 @@ python generate.py --model_path="path_to_inpainting_pipeline/trained_pipeline" -
 
 **Needed data**
 The provided code is adapted to FLAIR data.
-+ FLAIR dataset is publicly available here : https://ignf.github.io/FLAIR/index.html
++ FLAIR dataset is publicly available here: https://ignf.github.io/FLAIR/index.html
 + The files containing the prompts (FLAIR_Prompts.csv) and the instances footprints (instancesFootprints.pkl) are available on Zenodo : https://zenodo.org/records/15129648
 
 If you want to use another dataset as a basis for generation, you will have to adapt the "FLAIR_Dataset" class to the structure of your data and use your own prompts. Don't hesitate to reach out to us if you need further information.
