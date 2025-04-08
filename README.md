@@ -26,8 +26,11 @@
 
 ## Overview
 
+This repository is the official implementation to run the experiment of "The Change You Want to Detect" paper. It can be used to run the transfert learning experiments and evaluation on 5 different change detection dataset but also to generate new pair of images with change
 
-## Usage
+## Transfer Learning Experiments
+
+The following commands can fine-tune the pretrained change detection model for different transfer learning settings. 
 
 **Sequential mode : Pretraining + Fine-tuning**
 ```
@@ -60,6 +63,8 @@ python train.py --sequential --target_max_proportion=0.10 --batch=8 -mc --classe
 
 ## Hybrid Semantic Change Dataset Generation
 
+The following command can be used to generate new samples from the hybrid change detection dataset. 
+
 ```
 python generate.py --model_path="path_to_inpainting_pipeline/trained_pipeline" --controlnet_path="path_to_controlnet/trained_controlnet" --batch=1 --images_path="path_to_flair/flair_aerial_train" --save_dir="../data/CHG" --prompts_path="../data/FLAIR_Prompts.csv" --dfobjects_path="../data/instancesFootprints.pkl" --num_version=15
 ```
@@ -71,4 +76,4 @@ The provided code is adapted to FLAIR data.\
 + FLAIR dataset is publicly available here : https://ignf.github.io/FLAIR/index.html
 + The files containing the prompts (FLAIR_Prompts.csv) and the instances footprints (instancesFootprints.pkl) are available on Zenodo : https://zenodo.org/records/15129648
 
-If you want to use an other dataset as a basis for generation, you will have to adapt the "FLAIR_Dataset" class to the structure of your data and use your own prompts. Don't hesitate to contact us if you need further information.
+If you want to use another dataset as a basis for generation, you will have to adapt the "FLAIR_Dataset" class to the structure of your data and use your own prompts. Don't hesitate to reach out to us if you need further information.
