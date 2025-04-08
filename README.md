@@ -1,4 +1,29 @@
-# HySCDG
+<div align="center">
+<h1>The Change You Want To Detect: Semantic Change Detection In Earth Observation With Hybrid Data Generation</h1>
+
+<a href="https://arxiv.org/pdf/2503.15683" target="_blank" rel="noopener noreferrer">
+  <img src="https://img.shields.io/badge/Paper" alt="Paper PDF">
+</a>
+<a href="https://arxiv.org/abs/2503.15683"><img src="https://img.shields.io/badge/arXiv-2503.15683" alt="arXiv"></a>
+<a href="https://yb23.github.io/projects/cywd/"><img src="https://img.shields.io/badge/Project_Page-green" alt="Project Page"></a>
+<a href='https://huggingface.co/Yanis236/HySCDG'><img src='https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-blue'></a>
+
+**[Univ Gustave Eiffel, ENSG, IGN, LASTIG](https://www.umr-lastig.fr/)**;
+
+
+[Yanis Benidir](https://yb23.github.io/), [Nicolas Gonthier](https://ngonthier.github.io/), [Clément Mallet](https://www.umr-lastig.fr/clement-mallet/)
+</div>
+
+```bibtex
+@inproceedings{wang2025vggt,
+  title={The Change You Want To Detect: Semantic Change Detection In Earth Observation With Hybrid Data Generation},
+  author={Benidir, Yanis and Gonthier, Nicolas and Mallet, Clément},
+  booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
+  year={2025}
+}
+```
+
+## Overview
 
 
 ## Usage
