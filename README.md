@@ -17,13 +17,9 @@ python train.py --sequential --no_pretrain --batch=8 -mc --classes=20 --in_chann
 
 **Mixed mode : Pretraining x Fine-tuning**
 ```
-python train.py --mixed --mix_ratio=0.5 --batch=8 -mc --classes=10 --in_channels=3 --logdir=/my-folder/logs/ -p="MyWandbProject" --log_images_every=1 --model="unet" --pretrain_name="fsc" --pretrain_path=datasets/fsc-180k/ --fsc_versions 11 12 --mix_fsc_versions --epochs=10 --target_name="hiucd" --target_path=datasets/hiucd_mini_512/  --use_target_classes
+python train.py --mixed --mix_ratio=0.5 --batch=8 -mc --classes=10 --in_channels=3 --logdir=/my-folder/logs/ -p="MyWandbProject" --log_images_every=1 --model="unet" --pretrain_name="fsc" --pretrain_path=datasets/fsc-180k/ --fsc_versions 11 12 --mix_fsc_versions --epochs=10 --target_name="hiucd" --target_path=datasets/hiucd_mini_512/
 ```
 
-**Mixed mode : Pretraining x Fine-tuning**
-```
-python train.py --mixed --mix_ratio=0.5 --batch=8 -mc --classes=10 --in_channels=3 --logdir=/my-folder/logs/ -p="MyWandbProject" --log_images_every=1 --model="unet" --pretrain_name="fsc" --pretrain_path=datasets/fsc-180k/ --fsc_versions 11 12 --mix_fsc_versions --epochs=10 --target_name="hiucd" --target_path=datasets/hiucd_mini_512/  --use_target_classes
-```
 
 **Low Data Regime**
 ```

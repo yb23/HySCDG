@@ -159,7 +159,6 @@ class Lightning(LightningModule):
                 for layer in self.seg_model.segmentation_head.children():
                     if hasattr(layer, 'reset_parameters'):
                         layer.reset_parameters()
-                        print(abs(layer.weight).mean())
             if reset_change_head:
                 for layer in self.model.segmentation_head.children():
                     if hasattr(layer, 'reset_parameters'):
@@ -194,8 +193,6 @@ class Lightning(LightningModule):
     def configure_losses(self):
         loss = self.hparams["loss"]
         ignore_index = self.hparams["ignore_index"]
-        print("LOSSSSSSSSSSSSSSSS")
-        print(loss)
         if loss == "ce":
             ignore_value = -1000 if ignore_index is None else ignore_index
             if self.multiclass:
