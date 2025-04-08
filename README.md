@@ -10,15 +10,14 @@
 <a href='https://huggingface.co/Yanis236/FSC-Pretrained'><img src='https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Pretrained_DualUnet-blue'></a>
 <a href='https://huggingface.co/datasets/Yanis236/fsc-180k'><img src='https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Dataset_FSC_180k-b31b1b'></a>
 
-**[Univ Gustave Eiffel, ENSG, IGN, LASTIG](https://www.umr-lastig.fr/)**;
+**[Univ Gustave Eiffel, ENSG, IGN, LASTIG](https://www.umr-lastig.fr/)**
 
 
 [Yanis Benidir](https://yb23.github.io/), [Nicolas Gonthier](https://ngonthier.github.io/), [Clément Mallet](https://www.umr-lastig.fr/clement-mallet/)
 
 
-<br>
 **If you ❤️ or simply use this project, don't forget to give the repository a ⭐, it means a lot to us !**
-<br>
+
 </div>
 
 ```bibtex
