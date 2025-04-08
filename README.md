@@ -7,7 +7,7 @@
 <a href="https://arxiv.org/abs/2503.15683"><img src="https://img.shields.io/badge/arXiv-2503.15683-b31b1b" alt="arXiv"></a>
 <a href="https://yb23.github.io/projects/cywd/"><img src="https://img.shields.io/badge/Project_Page-green" alt="Project Page"></a>
 <a href='https://huggingface.co/Yanis236/HySCDG'><img src='https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-blue'></a>
-<a href='https://huggingface.co/datasets/Yanis236/fsc-180k'><img src='https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Dataset-FSC-180k-red'></a>
+<a href='https://huggingface.co/datasets/Yanis236/fsc-180k'><img src='https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Dataset_FSC_180k-b31b1b'></a>
 
 **[Univ Gustave Eiffel, ENSG, IGN, LASTIG](https://www.umr-lastig.fr/)**;
 
