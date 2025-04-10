@@ -58,7 +58,7 @@ def getArgs():
     parser.add_argument("--normalize", action="store_true")
     
     parser.add_argument("--target_max_proportion", default=1.0, type=float, help="Restrict available samples from the training set for training")
-    parser.add_argument("--epochs", default=1000, type=int)
+    parser.add_argument("--epochs", default=10, type=int)
     parser.add_argument("--epochs_finetune", default=1, type=int)
 
     parser.add_argument("--resume", action="store_true")
@@ -217,14 +217,14 @@ def main():
     callbacks = [lr_monitor, imageLogger]
 
     if (args.binary) and ("test" in data_target):
-        dm_only_change = dataset.LEVIR_DataModule(dict_train=data_target["test"], dict_val=data_target["test"], dict_test=data_target["test"], batch_size=min(args.batch, args.n_validation), num_channels=args.in_channels, isBinary=(not args.multiclass), class_mapping_to=class_mapping_to, dataset_name=args.mix_dataset, normalize=args.normalize, args=args)
+        dm_only_change = dataset.LEVIR_DataModule(dict_train=data_target["test"], dict_val=data_target["test"], dict_test=data_target["test"], batch_size=min(args.batch, args.n_validation), num_channels=args.in_channels, isBinary=(not args.multiclass), class_mapping_to=class_mapping_to, dataset_name=args.target_dataset, normalize=args.normalize, args=args)
         dm_only_change.prepare_data()
         dm_only_change.setup(stage="validate")
         val_samples_only_change = next(iter(dm_only_change.val_dataloader()))
         callbacks += [ImagePredictionLogger(val_samples_only_change, num_samples=len(val_samples_only_change["mask"]), log_every_n_epochs=args.log_images_every, name="examples_target_change")]        
     
     if args.only_test:
-        if args.mix_dataset=="":
+        if args.target_dataset=="":
             dm_target = dm_train
         elif args.sequential:
             model.configure_finetune(only_change=args.binary, freeze_encoder=args.freeze_encoder, freeze_decoder=args.freeze_decoder, new_n_classes=args.new_n_classes, reset_semantic_head=args.reset_semantic_head, reset_change_head=args.reset_change_head)
