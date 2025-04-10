@@ -74,8 +74,15 @@ python train.py --mixed --mix_ratio=0.5 --batch=8 -mc --classes=10 --in_channels
 python train.py --sequential --target_max_proportion=0.10 --batch=8 -mc --classes=20 --in_channels=3 --logdir=/my-folder/logs/ -p="MyWandbProject" --log_images_every=1 --model="unet" --pretrain_name="fsc" --pretrain_path=datasets/fsc-180k/ --fsc_versions 11 12 --mix_fsc_versions --epochs=10 --target_name="hiucd" --target_path=datasets/hiucd_mini_512/ --epochs_finetune=200 --new_n_classes=10
 ```
 
+**Evaluation (Inference) Only**
+```
+python train.py --only_test --sequential --no_pretrain --batch=8 -mc --classes=20 --in_channels=3 --logdir=/my-folder/logs/ -p="MyWandbProject" --log_images_every=1 --model="unet" --pretrain_name="fsc" --pretrain_path=datasets/fsc-180k/ --fsc_versions 11 12 --mix_fsc_versions --epochs=0 --target_name="hiucd" --target_path=datasets/hiucd_mini_512/ --epochs_finetune=0 --new_n_classes=10 --run_id="WANDB_ID_OF_PRETRAINING_RUN"
+```
+
 
 **Other tips**
+
++ If you want to evaluate the model on a pretraining dataset, you should pass `--target_name=""`. In this case, the target dataset will be the validation split of the pretraining dataset.
 
 + `--resume` and `--run_id` : If you want to continue an interrupted run, you have to provide the run_id of the run as well as the `--resume` argument (`--run_id="WANDB_RUN_ID" --resume`). If you just want to initialize the model weights from a specific checkpoint, you must only provide the `--run_id`. It can be either a WANDB_RUN_ID or directly a path to a .ckpt file.
 
