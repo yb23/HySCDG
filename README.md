@@ -90,6 +90,8 @@ python generate.py --model_path="path_to_inpainting_pipeline/trained_pipeline" -
 
 **If you need to run the code on CPU**, simply add the --cpu flag.
 
+Our pretrained pipeline is available on HuggingFace : https://huggingface.co/Yanis236/HySCDG. It can be directly used to run the generation pipeline.
+
 **Needed data**
 The provided code is adapted to FLAIR data.
 + FLAIR dataset is publicly available here: https://ignf.github.io/FLAIR/index.html
